@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ürün Detayı - Kafkas Boya</title>
+
+    <!-- Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- AOS Animation -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+
+    <!-- Splide CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@splidejs/splide@4.1.4/dist/css/splide.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        /* Ürün Görsel Navigasyon Butonları */
+        .image-nav-btn {
+            transition: all 0.3s ease;
+            opacity: 0.8;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+
+        .image-nav-btn:hover {
+            opacity: 1;
+            transform: scale(1.1);
+            background: rgba(255, 255, 255, 1);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+        }
+
+        .image-nav-btn i {
+            font-size: 1.2rem;
+            color: #333;
+        }
+
+        /* Thumbnail Stilleri */
+        .thumbnail {
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .thumbnail:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .thumbnail.active {
+            border: 3px solid #007bff !important;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 123, 255, 0.3);
+        }
+
+        /* Ana Görsel Konteyneri */
+        .main-image-container {
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        /* Görsel Değişim Animasyonu */
+        #main-product-image {
+            transition: all 0.4s ease-in-out;
+        }
+
+        .image-fade {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+
+        .image-visible {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Görsel Sayacı */
+        #image-counter {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        /* Benzer Ürünler Slider Butonları */
+        .splide__arrows {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            transform: translateY(-50%);
+            z-index: 10;
+        }
+
+        .splide__arrow {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            opacity: 0.9;
+        }
+
+        .splide__arrow:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+            opacity: 1;
+        }
+
+        .splide__arrow--prev {
+            left: -25px;
+        }
+
+        .splide__arrow--next {
+            right: -25px;
+        }
+
+        .splide__arrow svg {
+            fill: #333;
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Slider Progress Bar */
+        .splide__progress {
+            margin-top: 20px;
+        }
+
+        .splide__progress__bar {
+            height: 4px;
+            background: #007bff;
+            border-radius: 2px;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            .image-nav-btn {
+                width: 40px;
+                height: 40px;
+            }
+
+            .splide__arrow {
+                width: 40px;
+                height: 40px;
+            }
+
+            .splide__arrow--prev {
+                left: -15px;
+            }
+
+            .splide__arrow--next {
+                right: -15px;
+            }
+        }
+
+        /* Hover efekti için */
+        .main-image-container:hover .image-nav-btn {
+            opacity: 0.9;
+        }
+
+        .splide:hover .splide__arrow {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top bg-white shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold text-primary" href="index.html">
+                <img src="assets/img/kafkasboya-logo.png" alt="kafkas boya logo"
+                    style="height: 70px; margin-right: 10px;">
+            </a>
+
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav mx-auto">
+                    <li class="nav-item">
+                        <a class="nav-link fw-medium" href="index.html">Ana Sayfa</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle fw-medium" href="#" role="button" data-bs-toggle="dropdown">
+                            Ürünlerimiz
+                        </a>
+                        <ul class="dropdown-menu border-0 shadow-sm">
+                            <li><a class="dropdown-item" href="shop.html">Tüm Ürünler</a></li>
+                            <li><a class="dropdown-item" href="shop.html?marka=polisan">Polisan</a></li>
+                            <li><a class="dropdown-item" href="shop.html?marka=filli">Filli Boya</a></li>
+                            <li><a class="dropdown-item" href="shop.html?marka=marshall">Marshall</a></li>
+                            <li><a class="dropdown-item" href="shop.html?marka=dyo">DYO</a></li>
+                            <li><a class="dropdown-item" href="shop.html?marka=permolit">Permolit</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link fw-medium" href="about.html">Hakkımızda</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link fw-medium" href="contact.html">İletişim</a>
+                    </li>
+                </ul>
+
+                <div class="d-flex align-items-center">
+                    <a href="#" class="btn btn-outline-primary btn-sm me-2 position-relative" style="z-index: 1020;">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span class="position-absolute translate-middle badge rounded-pill bg-danger" 
+                            style="z-index: 1021; font-size: 0.6rem; min-width: 18px; height: 18px; line-height: 1.2; top: 10px; right: -10px; position: absolute;"
+                            id="cart-count">0</span>
+                    </a>
+                    <a href="admin/login.html" class="btn btn-primary btn-sm">
+                        <i class="fas fa-user me-1"></i>Giriş
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <section class="page-header bg-light py-5" style="margin-top: 76px;">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-12">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-2">
+                            <li class="breadcrumb-item"><a href="index.html"
+                                    class="text-decoration-none text-primary">Ana Sayfa</a></li>
+                            <li class="breadcrumb-item"><a href="shop.html"
+                                    class="text-decoration-none text-primary">Ürünler</a></li>
+                            <li class="breadcrumb-item active">Ürün Detayı</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Product Detail Section -->
+    <section class="py-5">
+        <div class="container">
+            <div class="row g-5">
+                <!-- Product Images -->
+                <div class="col-lg-6" data-aos="fade-right">
+                    <div class="product-images-container text-center position-relative">
+                        <!-- Ana Görsel -->
+                        <div class="main-image-container d-flex justify-content-center align-items-center rounded-4 overflow-hidden mb-3 position-relative" 
+                            style="height: 500px; background-color: #f8f9fa; border: 1px solid #e9ecef;">
+                            
+                            <!-- Önceki Butonu -->
+                            <button class="btn btn-light btn-sm position-absolute start-0 top-50 translate-middle-y ms-3 image-nav-btn"
+                                    id="prev-image-btn">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            
+                            <!-- Ana Görsel -->
+                            <img src="assets/img/shop_01.webp" alt="Polisan Premium İç Cephe" 
+                                id="main-product-image"
+                                class="image-visible"
+                                style="max-height: 100%; max-width: 100%; object-fit: contain;">
+                            
+                            <!-- Sonraki Butonu -->
+                            <button class="btn btn-light btn-sm position-absolute end-0 top-50 translate-middle-y me-3 image-nav-btn"
+                                    id="next-image-btn">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                            
+                            <!-- Görsel Sayacı -->
+                            <div class="position-absolute bottom-0 start-50 translate-middle-x mb-3">
+                                <span class="badge bg-dark bg-opacity-75 text-white px-3 py-2" 
+                                    id="image-counter" style="font-size: 0.8rem;">
+                                    1 / 3
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Thumbnail Images -->
+                        <div class="thumbnail-container">
+                            <div class="d-flex justify-content-center gap-2">
+                                <div class="thumbnail rounded overflow-hidden border cursor-pointer active" 
+                                    style="width: 80px; height: 80px;"
+                                    data-image="assets/img/shop_01.webp" data-index="0">
+                                    <img src="assets/img/shop_01.webp" alt="Polisan Premium İç Cephe" 
+                                        class="w-100 h-100" style="object-fit: cover;">
+                                </div>
+                                <div class="thumbnail rounded overflow-hidden border cursor-pointer" 
+                                    style="width: 80px; height: 80px;"
+                                    data-image="assets/img/shop_02.webp" data-index="1">
+                                    <img src="assets/img/shop_02.webp" alt="Polisan Premium Yan Görünüm" 
+                                        class="w-100 h-100" style="object-fit: cover;">
+                                </div>
+                                <div class="thumbnail rounded overflow-hidden border cursor-pointer" 
+                                    style="width: 80px; height: 80px;"
+                                    data-image="assets/img/shop_03.webp" data-index="2">
+                                    <img src="assets/img/shop_03.webp" alt="Polisan Premium Uygulama" 
+                                        class="w-100 h-100" style="object-fit: cover;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Info -->
+                <div class="col-lg-6" data-aos="fade-left">
+                    <div class="product-info-container">
+                        <!-- Brand & Category -->
+                        <div class="d-flex align-items-center mb-3">
+                            <span class="badge bg-primary me-2">Polisan</span>
+                            <span class="badge bg-light text-dark">İç Cephe</span>
+                            <span class="badge bg-success ms-auto">Stokta</span>
+                        </div>
+
+                        <!-- Product Title -->
+                        <h1 class="display-6 fw-bold text-dark mb-3" style="font-family: 'Playfair Display', serif;">
+                            Polisan Premium İç Cephe Boyası
+                        </h1>
+
+                        <!-- Rating & Reviews -->
+                        <div class="d-flex align-items-center mb-4">
+                            <div class="text-warning me-3">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                            </div>
+                            <span class="text-muted me-3">4.8 (127 yorum)</span>
+                            <a href="#reviews" class="text-primary">Yorumları Gör</a>
+                        </div>
+
+                        <!-- Price -->
+                        <div class="price-section mb-4">
+                            <div class="d-flex align-items-center">
+                                <h2 class="display-5 fw-bold text-primary mb-0">₺899</h2>
+                                <span class="text-muted ms-3 text-decoration-line-through">₺1,199</span>
+                                <span class="badge bg-danger ms-3">%25 İndirim</span>
+                            </div>
+                        </div>
+
+                        <!-- Short Description -->
+                        <div class="short-description mb-4">
+                            <p class="text-muted lead">
+                                Yüksek kaliteli iç cephe boyası. Kolay uygulanabilir, hızlı kuruyan ve uzun ömürlü
+                                formülü ile evinize mükemmel görünüm kazandırır.
+                            </p>
+                        </div>
+
+                        <!-- Product Options -->
+                        <div class="product-options mb-4">
+                            <!-- Volume Selection -->
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Hacim Seçin</label>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-outline-primary volume-option active" data-volume="15"
+                                        data-price="899">15 Litre</button>
+                                    <button class="btn btn-outline-primary volume-option" data-volume="5"
+                                        data-price="549">5 Litre</button>
+                                    <button class="btn btn-outline-primary volume-option" data-volume="2.5"
+                                        data-price="299">2.5 Litre</button>
+                                </div>
+                            </div>
+
+                            <!-- Color Selection -->
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Renk</label>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button class="btn btn-sm border color-option active"
+                                        style="background-color: #ffffff; width: 40px; height: 40px;" data-color="beyaz"
+                                        title="Beyaz"></button>
+                                    <button class="btn btn-sm border color-option"
+                                        style="background-color: #f8f9fa; width: 40px; height: 40px;" data-color="krem"
+                                        title="Krem"></button>
+                                    <button class="btn btn-sm border color-option"
+                                        style="background-color: #e9ecef; width: 40px; height: 40px;" data-color="gri"
+                                        title="Gri"></button>
+                                    <button class="btn btn-sm border color-option"
+                                        style="background-color: #fff3cd; width: 40px; height: 40px;" data-color="bej"
+                                        title="Bej"></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quantity & Add to Cart -->
+                        <div class="d-flex align-items-center gap-3 mb-4">
+                            <div class="quantity-selector d-flex align-items-center">
+                                <button class="btn btn-outline-secondary btn-sm quantity-decrease"
+                                    type="button">-</button>
+                                <input type="number" class="form-control text-center quantity-input" value="1" min="1"
+                                    max="10" style="width: 60px;">
+                                <button class="btn btn-outline-secondary btn-sm quantity-increase"
+                                    type="button">+</button>
+                            </div>
+                            <button class="btn btn-primary btn-lg flex-grow-1 add-to-cart"
+                                data-product="polisan-premium-15l">
+                                <i class="fas fa-shopping-cart me-2"></i>Sepete Ekle
+                            </button>
+                            <button class="btn btn-outline-danger btn-lg add-to-wishlist"
+                                data-product="polisan-premium-15l" title="Favorilere Ekle">
+                                <i class="fas fa-heart"></i>
+                            </button>
+                        </div>
+
+                        <!-- Stock Status -->
+                        <div class="stock-status mb-4">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                <span class="text-success fw-medium">Stokta - Hemen Kargoya</span>
+                            </div>
+                            <small class="text-muted">Son 24 ürün - Acele edin!</small>
+                        </div>
+
+                        <!-- Features -->
+                        <div class="features-section">
+                            <h5 class="fw-semibold mb-3">Ürün Özellikleri</h5>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <div class="feature-item d-flex align-items-center">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        <span class="small">Kolay Uygulama</span>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="feature-item d-flex align-items-center">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        <span class="small">Hızlı Kuruma</span>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="feature-item d-flex align-items-center">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        <span class="small">Uzun Ömürlü</span>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="feature-item d-flex align-items-center">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        <span class="small">Kokusuz</span>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="feature-item d-flex align-items-center">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        <span class="small">Solmaz Renk</span>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="feature-item d-flex align-items-center">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        <span class="small">Yıkanabilir</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="py-5 bg-light">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="product-tabs bg-white rounded-4 shadow-sm p-4">
+                        <ul class="nav nav-tabs border-0 mb-4" id="productTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="description-tab" data-bs-toggle="tab"
+                                    data-bs-target="#description" type="button">
+                                    Açıklama
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="specifications-tab" data-bs-toggle="tab"
+                                    data-bs-target="#specifications" type="button">
+                                    Teknik Özellikler
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="usage-tab" data-bs-toggle="tab" data-bs-target="#usage"
+                                    type="button">
+                                    Kullanım Talimatları
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="reviews-tab" data-bs-toggle="tab" data-bs-target="#reviews"
+                                    type="button">
+                                    Yorumlar (127)
+                                </button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content" id="productTabsContent">
+                            <!-- Description Tab -->
+                            <div class="tab-pane fade show active" id="description" role="tabpanel">
+                                <div class="description-content">
+                                    <h4 class="fw-semibold mb-3">Ürün Açıklaması</h4>
+                                    <p class="text-muted mb-4">
+                                        Polisan Premium İç Cephe Boyası, yüksek kaliteli akrilik reçine esaslı, su
+                                        bazlı, mat bir iç cephe boyasıdır.
+                                        Solmaya ve yıpranmaya karşı dayanıklı, yıkanabilir, kolay uygulanabilir ve hızlı
+                                        kuruyan özel formülü ile
+                                        evinizin duvarlarına uzun süre kalıcı bir güzellik kazandırır.
+                                    </p>
+
+                                    <h5 class="fw-semibold mb-3">Öne Çıkan Özellikler</h5>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <ul class="list-unstyled">
+                                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Üstün
+                                                    kapatıcılık</li>
+                                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Bükülmez
+                                                    film özelliği</li>
+                                                <li class="mb-2"><i
+                                                        class="fas fa-check text-success me-2"></i>Silinebilir yüzey
+                                                </li>
+                                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Koku
+                                                    içermez</li>
+                                            </ul>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <ul class="list-unstyled">
+                                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Çevre
+                                                    dostu</li>
+                                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>ISO 9001
+                                                    kalite belgesi</li>
+                                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>5 yıl
+                                                    garanti</li>
+                                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Çift
+                                                    taraflı ambalaj</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Specifications Tab -->
+                            <div class="tab-pane fade" id="specifications" role="tabpanel">
+                                <div class="specifications-content">
+                                    <h4 class="fw-semibold mb-3">Teknik Özellikler</h4>
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <tbody>
+                                                <tr>
+                                                    <td class="fw-semibold">Yapısı</td>
+                                                    <td>Su bazlı akrilik reçine esaslı</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="fw-semibold">Görünüş</td>
+                                                    <td>Mat</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="fw-semibold">Yoğunluk</td>
+                                                    <td>1,45 ± 0,05 g/cm³</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="fw-semibold">Viskozite</td>
+                                                    <td>100-110 KU (23°C'de)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="fw-semibold">Kuruma Süresi</td>
+                                                    <td>30 dakika (toz kuruması)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="fw-semibold">Tam Kuruma</td>
+                                                    <td>24 saat</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="fw-semibold">Tüketim</td>
+                                                    <td>6-8 m²/L (tek kat)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="fw-semibold">Saklama Süresi</td>
+                                                    <td>2 yıl (ağzı kapalı ambalajda)</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Usage Tab -->
+                            <div class="tab-pane fade" id="usage" role="tabpanel">
+                                <div class="usage-content">
+                                    <h4 class="fw-semibold mb-3">Kullanım Talimatları</h4>
+
+                                    <h5 class="fw-semibold text-primary mb-2">Uygulama Öncesi Hazırlık</h5>
+                                    <p class="text-muted mb-3">
+                                        Uygulama yapılacak yüzey kuru, temiz, tozsuz ve sağlam olmalıdır. Eski boyalı
+                                        yüzeylerde gevşek ve pul pul dökülen kısımlar kazınarak zımpara ile
+                                        düzleştirilmelidir.
+                                    </p>
+
+                                    <h5 class="fw-semibold text-primary mb-2">Astar Uygulaması</h5>
+                                    <p class="text-muted mb-3">
+                                        Yeni sıva ve betonarme yüzeylerde, toz emiciliği yüksek gözenekli yüzeylerde
+                                        Polisan Astar uygulanmalıdır. Astar tamamen kuruduktan sonra (4-6 saat) boya
+                                        uygulanabilir.
+                                    </p>
+
+                                    <h5 class="fw-semibold text-primary mb-2">Boya Uygulaması</h5>
+                                    <p class="text-muted mb-3">
+                                        Boya uygulaması öncesi gerekiyorsa maksimum %20 oranında su ile inceltilebilir.
+                                        Uygulama fırça, rulo veya püskürtme ile yapılabilir. En az 2 kat uygulama
+                                        önerilir.
+                                    </p>
+
+                                    <h5 class="fw-semibold text-primary mb-2">Katlar Arası Bekleme</h5>
+                                    <p class="text-muted mb-3">
+                                        Katlar arasında en az 4-6 saat beklenmelidir. Ortam sıcaklığı ve nem oranı
+                                        kuruma süresini etkileyebilir.
+                                    </p>
+
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        <strong>Uyarı:</strong> Uygulama sırasında ortam sıcaklığı +5°C ile +35°C
+                                        arasında olmalıdır. Güneşli ve rüzgarlı havalarda uygulama yapılmamalıdır.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Reviews Tab -->
+                            <div class="tab-pane fade" id="reviews" role="tabpanel">
+                                <div class="reviews-content">
+                                    <div class="d-flex justify-content-between align-items-center mb-4">
+                                        <h4 class="fw-semibold">Müşteri Yorumları</h4>
+                                        <button class="btn btn-primary" data-bs-toggle="modal"
+                                            data-bs-target="#reviewModal">
+                                            <i class="fas fa-star me-2"></i>Yorum Yaz
+                                        </button>
+                                    </div>
+
+                                    <!-- Rating Summary -->
+                                    <div class="rating-summary bg-light rounded-3 p-4 mb-4">
+                                        <div class="row align-items-center">
+                                            <div class="col-md-3 text-center">
+                                                <div class="display-4 fw-bold text-primary">4.8</div>
+                                                <div class="text-warning mb-2">
+                                                    <i class="fas fa-star"></i>
+                                                    <i class="fas fa-star"></i>
+                                                    <i class="fas fa-star"></i>
+                                                    <i class="fas fa-star"></i>
+                                                    <i class="fas fa-star"></i>
+                                                </div>
+                                                <small class="text-muted">127 yorum</small>
+                                            </div>
+                                            <div class="col-md-9">
+                                                <div class="rating-bars">
+                                                    <div class="d-flex align-items-center mb-2">
+                                                        <span class="me-2" style="width: 30px;">5★</span>
+                                                        <div class="progress flex-grow-1" style="height: 8px;">
+                                                            <div class="progress-bar bg-warning" style="width: 75%">
+                                                            </div>
+                                                        </div>
+                                                        <span class="ms-2 text-muted">95</span>
+                                                    </div>
+                                                    <div class="d-flex align-items-center mb-2">
+                                                        <span class="me-2" style="width: 30px;">4★</span>
+                                                        <div class="progress flex-grow-1" style="height: 8px;">
+                                                            <div class="progress-bar bg-warning" style="width: 20%">
+                                                            </div>
+                                                        </div>
+                                                        <span class="ms-2 text-muted">25</span>
+                                                    </div>
+                                                    <div class="d-flex align-items-center mb-2">
+                                                        <span class="me-2" style="width: 30px;">3★</span>
+                                                        <div class="progress flex-grow-1" style="height: 8px;">
+                                                            <div class="progress-bar bg-warning" style="width: 3%">
+                                                            </div>
+                                                        </div>
+                                                        <span class="ms-2 text-muted">4</span>
+                                                    </div>
+                                                    <div class="d-flex align-items-center mb-2">
+                                                        <span class="me-2" style="width: 30px;">2★</span>
+                                                        <div class="progress flex-grow-1" style="height: 8px;">
+                                                            <div class="progress-bar bg-warning" style="width: 1%">
+                                                            </div>
+                                                        </div>
+                                                        <span class="ms-2 text-muted">2</span>
+                                                    </div>
+                                                    <div class="d-flex align-items-center">
+                                                        <span class="me-2" style="width: 30px;">1★</span>
+                                                        <div class="progress flex-grow-1" style="height: 8px;">
+                                                            <div class="progress-bar bg-warning" style="width: 1%">
+                                                            </div>
+                                                        </div>
+                                                        <span class="ms-2 text-muted">1</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Reviews List -->
+                                    <div class="reviews-list">
+                                        <div class="review-item border-bottom pb-4 mb-4">
+                                            <div class="d-flex align-items-start">
+                                                <div class="reviewer-avatar bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3"
+                                                    style="width: 50px; height: 50px;">
+                                                    <i class="fas fa-user text-primary"></i>
+                                                </div>
+                                                <div class="flex-grow-1">
+                                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                                        <div>
+                                                            <h6 class="fw-semibold mb-1">Ahmet Yılmaz</h6>
+                                                            <div class="text-warning mb-1">
+                                                                <i class="fas fa-star"></i>
+                                                                <i class="fas fa-star"></i>
+                                                                <i class="fas fa-star"></i>
+                                                                <i class="fas fa-star"></i>
+                                                                <i class="fas fa-star"></i>
+                                                            </div>
+                                                            <small class="text-muted">15 Kasım 2024</small>
+                                                        </div>
+                                                    </div>
+                                                    <h6 class="fw-semibold mb-2">Harika bir ürün!</h6>
+                                                    <p class="text-muted">
+                                                        Ürün gerçekten kaliteli, uygulaması çok kolay ve kokusu yok.
+                                                        2 kat sürdüm ve mükemmel kapattı. Tavsiye ederim.
+                                                    </p>
+                                                    <div class="review-images d-flex gap-2 mt-3">
+                                                        <div class="review-image bg-light rounded"
+                                                            style="width: 60px; height: 60px;"></div>
+                                                        <div class="review-image bg-light rounded"
+                                                            style="width: 60px; height: 60px;"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="review-item border-bottom pb-4 mb-4">
+                                            <div class="d-flex align-items-start">
+                                                <div class="reviewer-avatar bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3"
+                                                    style="width: 50px; height: 50px;">
+                                                    <i class="fas fa-user text-success"></i>
+                                                </div>
+                                                <div class="flex-grow-1">
+                                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                                        <div>
+                                                            <h6 class="fw-semibold mb-1">Ayşe Kaya</h6>
+                                                            <div class="text-warning mb-1">
+                                                                <i class="fas fa-star"></i>
+                                                                <i class="fas fa-star"></i>
+                                                                <i class="fas fa-star"></i>
+                                                                <i class="fas fa-star"></i>
+                                                                <i class="far fa-star"></i>
+                                                            </div>
+                                                            <small class="text-muted">10 Kasım 2024</small>
+                                                        </div>
+                                                    </div>
+                                                    <h6 class="fw-semibold mb-2">Memnun kaldım</h6>
+                                                    <p class="text-muted">
+                                                        Fiyatına göre kaliteli bir ürün. Renk seçenekleri güzel,
+                                                        kuruma süresi de oldukça hızlı. Tekrar alırım.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="review-item">
+                                            <div class="d-flex align-items-start">
+                                                <div class="reviewer-avatar bg-warning bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3"
+                                                    style="width: 50px; height: 50px;">
+                                                    <i class="fas fa-user text-warning"></i>
+                                                </div>
+                                                <div class="flex-grow-1">
+                                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                                        <div>
+                                                            <h6 class="fw-semibold mb-1">Mehmet Demir</h6>
+                                                            <div class="text-warning mb-1">
+                                                                <i class="fas fa-star"></i>
+                                                                <i class="fas fa-star"></i>
+                                                                <i class="fas fa-star"></i>
+                                                                <i class="fas fa-star"></i>
+                                                                <i class="fas fa-star"></i>
+                                                            </div>
+                                                            <small class="text-muted">5 Kasım 2024</small>
+                                                        </div>
+                                                    </div>
+                                                    <h6 class="fw-semibold mb-2">Profesyonel kalite</h6>
+                                                    <p class="text-muted">
+                                                        Uzun zamandır boya badana işleriyle uğraşıyorum, bu ürün
+                                                        gerçekten profesyonel kalitede.
+                                                        Müşterilerim de çok memnun kaldı.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="text-center mt-4">
+                                        <button class="btn btn-outline-primary">Daha Fazla Yorum</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- Related Products -->
+<section class="py-5">
+    <div class="container">
+        <div class="text-center mb-5" data-aos="fade-up">
+            <h2 class="display-5 fw-bold text-dark mb-3" style="font-family: 'Playfair Display', serif;">
+                Benzer <span class="text-primary">Ürünler</span>
+            </h2>
+            <p class="lead text-muted">Sizin için seçtiğimiz öneriler</p>
+        </div>
+
+        <div class="position-relative" data-aos="fade-up" data-aos-delay="200">
+            <div class="splide" id="related-products">
+                <div class="splide__track">
+                    <ul class="splide__list">
+                        <!-- Product 1 -->
+                        <li class="splide__slide">
+                            <div class="product-card h-100 bg-white rounded-4 shadow-sm overflow-hidden hover-lift">
+                                <div class="product-image position-relative overflow-hidden" style="height: 200px;">
+                                    <img src="assets/img/shop_02.webp" alt="Filli Boya Renk Paleti" class="w-100 h-100 object-fit-cover">
+                                    <div class="product-badge position-absolute top-0 start-0 m-3">
+                                        <span class="badge bg-success">%15 İndirim</span>
+                                    </div>
+                                    <div class="product-actions position-absolute bottom-0 start-0 end-0 p-3 bg-white bg-opacity-90">
+                                        <button class="btn btn-primary btn-sm w-100 add-to-cart" data-product="filli-renk-paleti">
+                                            <i class="fas fa-shopping-cart me-1"></i>Sepete Ekle
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="product-info p-4">
+                                    <h5 class="fw-semibold text-dark mb-2">Filli Boya Renk Paleti</h5>
+                                    <p class="text-muted small mb-2">Kırmızı tonları, 2.5L - Renkli iç cephe</p>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="h5 text-primary fw-bold mb-0">₺459</span>
+                                        <div class="text-warning">
+                                            <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="far fa-star"></i>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-1 mb-3">
+                                        <span class="badge bg-light text-dark">Stokta</span>
+                                        <span class="badge bg-success">Filli Boya</span>
+                                    </div>
+                                    <a href="shop-single.html?product=filli-renk-paleti" class="btn btn-outline-primary btn-sm w-100">
+                                        <i class="fas fa-eye me-1"></i>Detaylı İncele
+                                    </a>
+                                </div>
+                            </div>
+                        </li>
+
+                        <!-- Product 2 -->
+                        <li class="splide__slide">
+                            <div class="product-card h-100 bg-white rounded-4 shadow-sm overflow-hidden hover-lift">
+                                <div class="product-image position-relative overflow-hidden" style="height: 200px;">
+                                    <img src="assets/img/shop_03.webp" alt="Marshall Dış Cephe" class="w-100 h-100 object-fit-cover">
+                                    <div class="product-actions position-absolute bottom-0 start-0 end-0 p-3 bg-white bg-opacity-90">
+                                        <button class="btn btn-primary btn-sm w-100 add-to-cart" data-product="marshall-dis-cephe">
+                                            <i class="fas fa-shopping-cart me-1"></i>Sepete Ekle
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="product-info p-4">
+                                    <h5 class="fw-semibold text-dark mb-2">Marshall Dış Cephe</h5>
+                                    <p class="text-muted small mb-2">Silinebilir beyaz, 10L - Dış cephe boyası</p>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="h5 text-primary fw-bold mb-0">₺1,299</span>
+                                        <div class="text-warning">
+                                            <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-1 mb-3">
+                                        <span class="badge bg-light text-dark">Stokta</span>
+                                        <span class="badge bg-warning">Marshall</span>
+                                    </div>
+                                    <a href="shop-single.html?product=marshall-dis-cephe" class="btn btn-outline-primary btn-sm w-100">
+                                        <i class="fas fa-eye me-1"></i>Detaylı İncele
+                                    </a>
+                                </div>
+                            </div>
+                        </li>
+
+                        <!-- Product 3 -->
+                        <li class="splide__slide">
+                            <div class="product-card h-100 bg-white rounded-4 shadow-sm overflow-hidden hover-lift">
+                                <div class="product-image position-relative overflow-hidden" style="height: 200px;">
+                                    <img src="assets/img/shop_04.webp" alt="DYO Eko Serisi" class="w-100 h-100 object-fit-cover">
+                                    <div class="product-badge position-absolute top-0 start-0 m-3">
+                                        <span class="badge bg-info">Çok Satan</span>
+                                    </div>
+                                    <div class="product-actions position-absolute bottom-0 start-0 end-0 p-3 bg-white bg-opacity-90">
+                                        <button class="btn btn-primary btn-sm w-100 add-to-cart" data-product="dyo-eko-serisi">
+                                            <i class="fas fa-shopping-cart me-1"></i>Sepete Ekle
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="product-info p-4">
+                                    <h5 class="fw-semibold text-dark mb-2">DYO Eko Serisi</h5>
+                                    <p class="text-muted small mb-2">Ekonomik beyaz, 17L - İç cephe boyası</p>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="h5 text-primary fw-bold mb-0">₺649</span>
+                                        <div class="text-warning">
+                                            <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="far fa-star"></i>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-1 mb-3">
+                                        <span class="badge bg-light text-dark">Stokta</span>
+                                        <span class="badge bg-info">DYO</span>
+                                    </div>
+                                    <a href="shop-single.html?product=dyo-eko-serisi" class="btn btn-outline-primary btn-sm w-100">
+                                        <i class="fas fa-eye me-1"></i>Detaylı İncele
+                                    </a>
+                                </div>
+                            </div>
+                        </li>
+
+                        <!-- Product 4 -->
+                        <li class="splide__slide">
+                            <div class="product-card h-100 bg-white rounded-4 shadow-sm overflow-hidden hover-lift">
+                                <div class="product-image position-relative overflow-hidden" style="height: 200px;">
+                                    <img src="assets/img/shop_05.webp" alt="Permolit Ahşap Verniği" class="w-100 h-100 object-fit-cover">
+                                    <div class="product-badge position-absolute top-0 start-0 m-3">
+                                        <span class="badge bg-warning">Sınırlı</span>
+                                    </div>
+                                    <div class="product-actions position-absolute bottom-0 start-0 end-0 p-3 bg-white bg-opacity-90">
+                                        <button class="btn btn-primary btn-sm w-100 add-to-cart" data-product="permolit-vernik">
+                                            <i class="fas fa-shopping-cart me-1"></i>Sepete Ekle
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="product-info p-4">
+                                    <h5 class="fw-semibold text-dark mb-2">Permolit Ahşap Verniği</h5>
+                                    <p class="text-muted small mb-2">Şeffaf parlak, 5L - Ahşap verniği</p>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="h5 text-primary fw-bold mb-0">₺789</span>
+                                        <div class="text-warning">
+                                            <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-1 mb-3">
+                                        <span class="badge bg-light text-dark">Stokta</span>
+                                        <span class="badge bg-info">Permolit</span>
+                                    </div>
+                                    <a href="shop-single.html?product=permolit-vernik" class="btn btn-outline-primary btn-sm w-100">
+                                        <i class="fas fa-eye me-1"></i>Detaylı İncele
+                                    </a>
+                                </div>
+                            </div>
+                        </li>
+
+                        <!-- Product 5 -->
+                        <li class="splide__slide">
+                            <div class="product-card h-100 bg-white rounded-4 shadow-sm overflow-hidden hover-lift">
+                                <div class="product-image position-relative overflow-hidden" style="height: 200px;">
+                                    <img src="assets/img/shop_06.webp" alt="Polisan Astar" class="w-100 h-100 object-fit-cover">
+                                    <div class="product-actions position-absolute bottom-0 start-0 end-0 p-3 bg-white bg-opacity-90">
+                                        <button class="btn btn-primary btn-sm w-100 add-to-cart" data-product="polisan-astar">
+                                            <i class="fas fa-shopping-cart me-1"></i>Sepete Ekle
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="product-info p-4">
+                                    <h5 class="fw-semibold text-dark mb-2">Polisan Astar</h5>
+                                    <p class="text-muted small mb-2">Beyaz astar, 5L - Temel astar</p>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="h5 text-primary fw-bold mb-0">₺299</span>
+                                        <div class="text-warning">
+                                            <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="far fa-star"></i>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-1 mb-3">
+                                        <span class="badge bg-light text-dark">Stokta</span>
+                                        <span class="badge bg-primary">Polisan</span>
+                                    </div>
+                                    <a href="shop-single.html?product=polisan-astar" class="btn btn-outline-primary btn-sm w-100">
+                                        <i class="fas fa-eye me-1"></i>Detaylı İncele
+                                    </a>
+                                </div>
+                            </div>
+                        </li>
+
+                        <!-- Product 6 -->
+                        <li class="splide__slide">
+                            <div class="product-card h-100 bg-white rounded-4 shadow-sm overflow-hidden hover-lift">
+                                <div class="product-image position-relative overflow-hidden" style="height: 200px;">
+                                    <img src="assets/img/shop_07.webp" alt="Filli Suluboya" class="w-100 h-100 object-fit-cover">
+                                    <div class="product-actions position-absolute bottom-0 start-0 end-0 p-3 bg-white bg-opacity-90">
+                                        <button class="btn btn-primary btn-sm w-100 add-to-cart" data-product="filli-suluboya">
+                                            <i class="fas fa-shopping-cart me-1"></i>Sepete Ekle
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="product-info p-4">
+                                    <h5 class="fw-semibold text-dark mb-2">Filli Suluboya</h5>
+                                    <p class="text-muted small mb-2">Mavi tonu, 1L - Sanatsal suluboya</p>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="h5 text-primary fw-bold mb-0">₺159</span>
+                                        <div class="text-warning">
+                                            <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="far fa-star"></i>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-1 mb-3">
+                                        <span class="badge bg-light text-dark">Stokta</span>
+                                        <span class="badge bg-success">Filli Boya</span>
+                                    </div>
+                                    <a href="shop-single.html?product=filli-suluboya" class="btn btn-outline-primary btn-sm w-100">
+                                        <i class="fas fa-eye me-1"></i>Detaylı İncele
+                                    </a>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Splide Progress Bar -->
+                <div class="splide__progress mt-4">
+                    <div class="splide__progress__bar"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white py-5">
+        <div class="container">
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <div class="footer-brand">
+                        <img src="assets/img/kafkasboya-logo.png" alt="kafkas boya logo"
+                            style="height: 60px; margin-bottom: 15px; background-color: white;">
+                        <p class="text-light mb-3">
+                            20 yıllık deneyimimizle, profesyonel boya çözümleri sunuyoruz.
+                            En kaliteli markalar, geniş ürün yelpazesi ve uzman desteğiyle yanınızdayız.
+                        </p>
+                        <div class="social-links">
+                            <a href="#" class="text-white me-3"><i class="fab fa-facebook-f"></i></a>
+                            <a href="#" class="text-white me-3"><i class="fab fa-instagram"></i></a>
+                            <a href="#" class="text-white me-3"><i class="fab fa-twitter"></i></a>
+                            <a href="#" class="text-white"><i class="fab fa-linkedin-in"></i></a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-2">
+                    <h5 class="fw-semibold mb-3 text-light">Ürünler</h5>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><a href="shop.html?marka=polisan"
+                                class="text-light text-decoration-none">Polisan</a></li>
+                        <li class="mb-2"><a href="shop.html?marka=filli" class="text-light text-decoration-none">Filli
+                                Boya</a></li>
+                        <li class="mb-2"><a href="shop.html?marka=marshall"
+                                class="text-light text-decoration-none">Marshall</a></li>
+                        <li class="mb-2"><a href="shop.html?marka=dyo" class="text-light text-decoration-none">DYO</a>
+                        </li>
+                        <li class="mb-2"><a href="shop.html?marka=permolit"
+                                class="text-light text-decoration-none">Permolit</a></li>
+                    </ul>
+                </div>
+
+                <div class="col-lg-2">
+                    <h5 class="fw-semibold mb-3 text-light">Hızlı Erişim</h5>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><a href="index.html" class="text-light text-decoration-none">Ana Sayfa</a></li>
+                        <li class="mb-2"><a href="shop.html" class="text-light text-decoration-none">Ürünler</a></li>
+                        <li class="mb-2"><a href="about.html" class="text-light text-decoration-none">Hakkımızda</a>
+                        </li>
+                        <li class="mb-2"><a href="contact.html" class="text-light text-decoration-none">İletişim</a>
+                        </li>
+                        <li class="mb-2"><a href="admin/login.html" class="text-light text-decoration-none">Admin
+                                Paneli</a></li>
+                    </ul>
+                </div>
+
+                <div class="col-lg-4">
+                    <h5 class="fw-semibold mb-3 text-light">İletişim</h5>
+                    <div class="contact-info">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-map-marker-alt text-primary me-3"></i>
+                            <span class="text-light">İstanbul, Türkiye</span>
+                        </div>
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-phone text-primary me-3"></i>
+                            <span class="text-light">0555 123 4567</span>
+                        </div>
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-envelope text-primary me-3"></i>
+                            <span class="text-light">info@kafkasboya.com</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="my-4">
+
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <p class="mb-0 text-light">&copy; 2024 Kafkas Boya. Tüm hakları saklıdır.</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="mb-0 text-light">Laravel & MySQL E-ticaret Sistemi</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- AOS Animation JS -->
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+
+    <!-- Splide JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@splidejs/splide@4.1.4/dist/js/splide.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="assets/js/main.js"></script>
+
+    <script>
+        // Simple Image Gallery
+        document.addEventListener('DOMContentLoaded', function () {
+            // Ürün Görsel Navigasyonu
+            let currentImageIndex = 0;
+            const thumbnails = document.querySelectorAll('.thumbnail');
+            const mainImage = document.getElementById('main-product-image');
+            const prevBtn = document.getElementById('prev-image-btn');
+            const nextBtn = document.getElementById('next-image-btn');
+            const imageCounter = document.getElementById('image-counter');
+            const totalImages = thumbnails.length;
+
+            // Görsel değiştirme fonksiyonu
+            function changeImage(index) {
+                if (index < 0) index = totalImages - 1;
+                if (index >= totalImages) index = 0;
+                
+                currentImageIndex = index;
+                
+                // Animasyon başlat
+                mainImage.classList.remove('image-visible');
+                mainImage.classList.add('image-fade');
+                
+                setTimeout(() => {
+                    const newSrc = thumbnails[currentImageIndex].getAttribute('data-image');
+                    const newAlt = thumbnails[currentImageIndex].querySelector('img').alt;
+                    
+                    mainImage.src = newSrc;
+                    mainImage.alt = newAlt;
+                    
+                    // Thumbnail aktif durumunu güncelle
+                    thumbnails.forEach(thumb => thumb.classList.remove('active'));
+                    thumbnails[currentImageIndex].classList.add('active');
+                    
+                    // Sayacı güncelle
+                    imageCounter.textContent = `${currentImageIndex + 1} / ${totalImages}`;
+                    
+                    // Yeni görseli göster
+                    mainImage.classList.remove('image-fade');
+                    mainImage.classList.add('image-visible');
+                }, 200);
+            }
+
+            // Thumbnail click functionality
+            thumbnails.forEach((thumb, index) => {
+                thumb.addEventListener('click', function () {
+                    changeImage(index);
+                });
+            });
+
+            // Önceki butonu
+            prevBtn.addEventListener('click', function () {
+                changeImage(currentImageIndex - 1);
+            });
+
+            // Sonraki butonu
+            nextBtn.addEventListener('click', function () {
+                changeImage(currentImageIndex + 1);
+            });
+
+            // Klavye navigasyonu
+            document.addEventListener('keydown', function (e) {
+                // Sadece sayfada başka bir input focus olmadığında çalışsın
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+                
+                if (e.key === 'ArrowLeft') {
+                    changeImage(currentImageIndex - 1);
+                } else if (e.key === 'ArrowRight') {
+                    changeImage(currentImageIndex + 1);
+                }
+            });
+
+            // Related products slider with custom arrows
+            const relatedProducts = new Splide('#related-products', {
+                type: 'loop',
+                perPage: 4,
+                perMove: 1,
+                gap: '2rem',
+                autoplay: true,
+                interval: 4000,
+                pauseOnHover: true,
+                pagination: false,
+                arrows: true,
+                breakpoints: {
+                    1200: {
+                        perPage: 3,
+                    },
+                    992: {
+                        perPage: 3
+                    },
+                    768: {
+                        perPage: 2,
+                        gap: '1rem'
+                    },
+                    480: {
+                        perPage: 1,
+                        gap: '1rem'
+                    }
+                }
+            });
+
+            // Progress bar ekle
+            relatedProducts.on('mounted move', function () {
+                var end = relatedProducts.Components.Controller.getEnd() + 1;
+                var rate = Math.min((relatedProducts.index + 1) / end, 1);
+                relatedProducts.root.querySelector('.splide__progress__bar').style.width = String(rate * 100) + '%';
+            });
+
+            relatedProducts.mount();
+
+            // Quantity controls
+            const quantityInput = document.querySelector('.quantity-input');
+            const decreaseBtn = document.querySelector('.quantity-decrease');
+            const increaseBtn = document.querySelector('.quantity-increase');
+
+            decreaseBtn.addEventListener('click', function () {
+                let value = parseInt(quantityInput.value);
+                if (value > 1) {
+                    quantityInput.value = value - 1;
+                }
+            });
+
+            increaseBtn.addEventListener('click', function () {
+                let value = parseInt(quantityInput.value);
+                if (value < 10) {
+                    quantityInput.value = value + 1;
+                }
+            });
+
+            // Volume options
+            const volumeOptions = document.querySelectorAll('.volume-option');
+            volumeOptions.forEach(option => {
+                option.addEventListener('click', function () {
+                    volumeOptions.forEach(opt => opt.classList.remove('active'));
+                    this.classList.add('active');
+
+                    // Update price based on volume
+                    const price = this.getAttribute('data-price');
+                    const priceElement = document.querySelector('.price-section h2');
+                    if (price && priceElement) {
+                        priceElement.textContent = `₺${price}`;
+                    }
+                });
+            });
+
+            // Color options
+            const colorOptions = document.querySelectorAll('.color-option');
+            colorOptions.forEach(option => {
+                option.addEventListener('click', function () {
+                    colorOptions.forEach(opt => opt.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+
+            // Rating input
+            const ratingStars = document.querySelectorAll('.rating-input .fa-star');
+            let selectedRating = 0;
+
+            ratingStars.forEach((star, index) => {
+                star.addEventListener('click', function () {
+                    selectedRating = parseInt(this.getAttribute('data-rating'));
+                    updateRatingDisplay();
+                });
+
+                star.addEventListener('mouseenter', function () {
+                    const hoverRating = parseInt(this.getAttribute('data-rating'));
+                    updateRatingDisplay(hoverRating);
+                });
+            });
+
+            document.querySelector('.rating-input').addEventListener('mouseleave', function () {
+                updateRatingDisplay(selectedRating);
+            });
+
+            function updateRatingDisplay(rating = selectedRating) {
+                ratingStars.forEach((star, index) => {
+                    if (index < rating) {
+                        star.classList.remove('text-muted');
+                        star.classList.add('text-warning');
+                    } else {
+                        star.classList.remove('text-warning');
+                        star.classList.add('text-muted');
+                    }
+                });
+            }
+
+            // Review form submission
+            document.getElementById('reviewForm').addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                if (selectedRating === 0) {
+                    alert('Lütfen puan veriniz.');
+                    return;
+                }
+
+                // Simulate form submission
+                const alert = document.createElement('div');
+                alert.className = 'alert alert-success alert-dismissible fade show mt-3';
+                alert.innerHTML = `
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>Başarılı!</strong> Yorumunuz gönderildi. Onaylandıktan sonra yayınlanacaktır.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+
+                this.parentNode.insertBefore(alert, this);
+
+                // Reset form
+                this.reset();
+                selectedRating = 0;
+                updateRatingDisplay();
+
+                // Close modal
+                bootstrap.Modal.getInstance(document.getElementById('reviewModal')).hide();
+
+                // Remove alert after 5 seconds
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.remove();
+                    }
+                }, 5000);
+            });
+
+            // Add to cart functionality
+            const addToCartButtons = document.querySelectorAll('.add-to-cart');
+            addToCartButtons.forEach(button => {
+                button.addEventListener('click', function () {
+                    const productId = this.getAttribute('data-product');
+                    const quantity = document.querySelector('.quantity-input').value;
+                    const selectedVolume = document.querySelector('.volume-option.active').getAttribute('data-volume');
+                    const selectedColor = document.querySelector('.color-option.active').getAttribute('data-color');
+
+                    // Simulate adding to cart
+                    const cartCount = document.getElementById('cart-count');
+                    let currentCount = parseInt(cartCount.textContent);
+                    cartCount.textContent = currentCount + 1;
+
+                    // Show success message
+                    const toast = document.createElement('div');
+                    toast.className = 'position-fixed top-0 end-0 p-3';
+                    toast.style.zIndex = '9999';
+                    toast.innerHTML = `
+                        <div class="toast show" role="alert">
+                            <div class="toast-header">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                <strong class="me-auto">Başarılı</strong>
+                                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                            </div>
+                            <div class="toast-body">
+                                Ürün sepete eklendi!
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(toast);
+
+                    // Remove toast after 3 seconds
+                    setTimeout(() => {
+                        toast.remove();
+                    }, 3000);
+
+                    // Here you would normally send data to your backend
+                    console.log('Added to cart:', {
+                        productId,
+                        quantity,
+                        volume: selectedVolume,
+                        color: selectedColor
+                    });
+                });
+            });
+
+            // Add to wishlist functionality
+            const wishlistButtons = document.querySelectorAll('.add-to-wishlist');
+            wishlistButtons.forEach(button => {
+                button.addEventListener('click', function () {
+                    const productId = this.getAttribute('data-product');
+
+                    // Toggle wishlist state
+                    this.classList.toggle('text-danger');
+
+                    if (this.classList.contains('text-danger')) {
+                        this.innerHTML = '<i class="fas fa-heart"></i>';
+                        // Show added to wishlist message
+                        showToast('Ürün favorilere eklendi!', 'success');
+                    } else {
+                        this.innerHTML = '<i class="fas fa-heart"></i>';
+                        // Show removed from wishlist message
+                        showToast('Ürün favorilerden kaldırıldı!', 'info');
+                    }
+
+                    console.log('Wishlist updated:', productId);
+                });
+            });
+
+            // Helper function to show toast messages
+            function showToast(message, type = 'info') {
+                const toast = document.createElement('div');
+                toast.className = 'position-fixed top-0 end-0 p-3';
+                toast.style.zIndex = '9999';
+
+                const bgClass = type === 'success' ? 'bg-success' : 'bg-info';
+
+                toast.innerHTML = `
+                    <div class="toast show" role="alert">
+                        <div class="toast-header ${bgClass} text-white">
+                            <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-info-circle'} me-2"></i>
+                            <strong class="me-auto">${type === 'success' ? 'Başarılı' : 'Bilgi'}</strong>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+                        </div>
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(toast);
+
+                setTimeout(() => {
+                    toast.remove();
+                }, 3000);
+            }
+
+            // Initialize AOS animations
+            AOS.init({
+                duration: 1000,
+                once: true,
+                offset: 100
+            });
+        });
+    </script>
+</body>
+
+</html>
