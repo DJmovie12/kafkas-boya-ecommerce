@@ -1,11 +1,14 @@
 <?php
-$page_title = "Ödeme";
-require_once 'includes/header.php';
+// 1. ÖNCE MANTIK VE YÖNLENDİRMELER (HTML ÇIKTISI YOK)
+require_once 'includes/db_connect.php';
 require_once 'includes/session.php';
+
+$page_title = "Ödeme";
 
 // Giriş kontrolü
 if (!isUserLoggedIn()) {
-    header("Location: /login.php");
+    // Giriş yapmamışsa login sayfasına yönlendir
+    header("Location: /login.php?redirect=checkout.php");
     exit();
 }
 
@@ -14,7 +17,8 @@ $error = '';
 $success = '';
 
 // Sepeti al
-$stmt = $conn->prepare("SELECT c.*, p.name, p.price 
+// NOT: 'c.*' yerine 'c.quantity' gibi spesifik alanları seçmek daha iyidir, çakışmaları önler.
+$stmt = $conn->prepare("SELECT c.product_id, c.quantity, p.name, p.price 
                         FROM cart c 
                         JOIN products p ON c.product_id = p.id 
                         WHERE c.user_id = ?");
@@ -38,7 +42,7 @@ foreach ($cart_items as $item) {
 $tax = $subtotal * 0.18;
 $total = $subtotal + $tax;
 
-// Sipariş oluştur
+// Sipariş oluşturma işlemi (POST isteği)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $full_name = trim($_POST['full_name'] ?? '');
     $email = trim($_POST['email'] ?? '');
@@ -55,7 +59,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Ödeme yöntemi seçiniz.';
     } else {
         // Sipariş oluştur
-        $stmt = $conn->prepare("INSERT INTO orders (user_id, total_amount, status) VALUES (?, ?, 'pending')");
+        // created_at ve updated_at otomatik olarak timestamp alacaktır.
+        $stmt = $conn->prepare("INSERT INTO orders (user_id, total_amount, STATUS) VALUES (?, ?, 'pending')");
         $stmt->bind_param("id", $user_id, $total);
         
         if ($stmt->execute()) {
@@ -64,16 +69,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Sipariş öğelerini ekle
             $insert_ok = true;
+            
+            // order_items tablosuna çoklu ekleme (Transaction kullanımı önerilir ama bu yapı da çalışır)
+            $item_stmt = $conn->prepare("INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)");
+            
             foreach ($cart_items as $item) {
-                $item_stmt = $conn->prepare("INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)");
                 $item_stmt->bind_param("iiii", $order_id, $item['product_id'], $item['quantity'], $item['price']);
-                
                 if (!$item_stmt->execute()) {
                     $insert_ok = false;
-                    break;
+                    // Hata durumunda break ile döngüden çık
+                    break; 
                 }
-                $item_stmt->close();
             }
+            $item_stmt->close();
 
             if ($insert_ok) {
                 // Sepeti temizle
@@ -83,16 +91,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $clear_stmt->close();
 
                 // Sipariş onay sayfasına yönlendir
+                // Not: order-confirmation.php sayfasını ayrıca oluşturmalısınız.
                 header("Location: /order-confirmation.php?order_id=" . $order_id);
                 exit();
             } else {
-                $error = 'Sipariş oluşturulurken bir hata oluştu.';
+                $error = 'Sipariş detayları kaydedilirken bir hata oluştu.';
+                // Hata durumunda oluşturulan siparişi silebilirsiniz (opsiyonel)
             }
         } else {
             $error = 'Sipariş oluşturulurken bir hata oluştu.';
         }
     }
 }
+
+// 2. MANTIK BİTTİKTEN SONRA HEADER DAHİL EDİLİR
+require_once 'includes/header.php'; 
 ?>
 
     <!-- Page Header -->
@@ -146,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     </div>
                                     <div class="col-md-6">
                                         <label for="email" class="form-label fw-medium">E-posta *</label>
-                                        <input type="email" class="form-control" id="email" name="email" value="<?php echo htmlspecialchars($_SESSION['email']); ?>" required>
+                                        <input type="email" class="form-control" id="email" name="email" value="<?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?>" required>
                                     </div>
                                     <div class="col-md-6">
                                         <label for="phone" class="form-label fw-medium">Telefon *</label>

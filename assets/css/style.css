@@ -1247,3 +1247,65 @@ a:focus,
     transform-origin: center center;
     max-width: 100% !important;
 }
+
+/* Brand Card Alignment Fix: Ensures all buttons are at the bottom */
+.brand-card {
+    display: flex; /* Kartı bir flex konteyner yapar */
+    flex-direction: column; /* İçeriği dikey olarak düzenler */
+    /* h-100 class'ı HTML'de olduğu için yükseklik garantilidir */
+}
+
+/* Button Alignment: Butonları kartın altına iter */
+.brand-card a.btn {
+    margin-top: auto; /* Kendisinden önceki içeriğin ne kadar yer kapladığına bakılmaksızın butonu en alta iter */
+}
+
+/* Neden Biz Section - Modern Kart Stilleri */
+
+/* Genel kart görünümü ve hiza sabitlemesi */
+.feature-card-modern {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: 1px solid var(--neutral-light); /* Hafif bir çerçeve */
+}
+
+/* Kartın üzerine gelindiğinde (Hover) hafif kaldırma ve gölge efekti */
+.feature-card-modern:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* İkonu çevreleyen yuvarlak container */
+.icon-circle {
+    width: 65px;
+    height: 65px;
+    margin: 0 auto; /* Ortalamak için */
+    border: 2px solid; /* Hafif bir renkli kenarlık */
+}
+
+/* Her kart rengine göre kenarlık ve arka plan rengi ayarı */
+.feature-card-modern .bg-primary.bg-opacity-10 {
+    border-color: var(--primary-color);
+}
+.feature-card-modern .bg-success.bg-opacity-10 {
+    border-color: #5DADE2; /* success için belirgin renk */
+}
+.feature-card-modern .bg-warning.bg-opacity-10 {
+    border-color: var(--warning-color);
+}
+.feature-card-modern .bg-info.bg-opacity-10 {
+    border-color: var(--info-color);
+}
+
+/* --------- Önceki Talep Düzeltmeleri --------- */
+
+/* Brand Card Alignment Fix: Ensures all buttons are at the bottom */
+.brand-card {
+    display: flex; /* Kartı bir flex konteyner yapar */
+    flex-direction: column; /* İçeriği dikey olarak düzenler */
+    /* h-100 class'ı HTML'de olduğu için yükseklik garantilidir */
+}
+
+/* Button Alignment: Butonları kartın altına iter */
+.brand-card a.btn {
+    margin-top: auto; /* Kendisinden önceki içeriğin ne kadar yer kapladığına bakılmaksızın butonu en alta iter */
+}

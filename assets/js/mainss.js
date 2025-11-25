@@ -3,189 +3,25 @@
 
 class KafkasBoyaApp {
     constructor() {
-        // Sepet ve İstek Listesi verileri artık PHP/Veritabanı tarafından yönetildiği için, 
-        // bu JS objeleri sadece fallback veya client-side state için kullanılır.
-        this.cart = JSON.parse(localStorage.getItem('kafkasCart')) || []; 
+        this.cart = JSON.parse(localStorage.getItem('kafkasCart')) || [];
         this.wishlist = JSON.parse(localStorage.getItem('kafkasWishlist')) || [];
         this.init();
     }
 
     init() {
-        // Uygulama bileşenlerini sırayla başlat
         this.initializeEventListeners();
         this.initializeAnimations();
         this.initializeCart();
         this.initializeWishlist();
         this.initializeSearch();
         this.initializeScrollEffects();
-        
-        // Miktar artırma/azaltma event'larını başlat
-        this.initializeQuantityControls();
-        
-        // Sayfa yüklendiğinde sepet sayacını DOM'dan güncel tut
-        this.updateCartCountFromDOM();
-    }
-
-    // DOM'dan mevcut sepet sayısını okur
-    updateCartCountFromDOM() {
-        const cartCountElement = document.getElementById('cart-count');
-        if (cartCountElement) {
-            const currentCount = parseInt(cartCountElement.textContent) || 0;
-            this.updateCartCount(currentCount);
-        }
-    }
-    
-    // Sepet Sayısını Güncelleyen Fonksiyon
-    updateCartCount(newCount) {
-        const cartCountElement = document.getElementById('cart-count');
-        const cartBadge = document.getElementById('cart-badge');
-        
-        if (cartCountElement && newCount !== undefined) {
-            cartCountElement.textContent = newCount;
-            cartCountElement.style.display = newCount > 0 ? 'block' : 'none';
-        }
-        
-        if (cartBadge && newCount !== undefined) {
-            cartBadge.textContent = newCount;
-            if (newCount > 0) {
-                cartBadge.classList.remove('d-none');
-            } else {
-                cartBadge.classList.add('d-none');
-            }
-        }
-    }
-
-    // Bilgilendirme Mesajı Gösterme Fonksiyonu
-    showNotification(message, type = 'success') {
-        // Create notification element
-        const notification = document.createElement('div');
-        notification.className = `alert alert-${type} position-fixed top-0 end-0 m-3 z-index-3 slide-up`;
-        notification.style.minWidth = '300px';
-        notification.style.zIndex = '9999';
-        notification.innerHTML = `
-            <div class="d-flex align-items-center">
-                <i class="fas fa-${this.getNotificationIcon(type)} me-2"></i>
-                <span>${message}</span>
-                <button type="button" class="btn-close ms-auto" onclick="this.parentElement.parentElement.remove()"></button>
-            </div>
-        `;
-
-        document.body.appendChild(notification);
-
-        // Auto remove after 5 seconds
-        setTimeout(() => {
-            if (notification.parentElement) {
-                notification.remove();
-            }
-        }, 5000);
-    }
-
-    getNotificationIcon(type) {
-        const icons = {
-            success: 'check-circle',
-            error: 'exclamation-circle',
-            warning: 'exclamation-triangle',
-            info: 'info-circle'
-        };
-        return icons[type] || icons.info;
-    }
-
-    // Miktar Artırma/Azaltma Mantığı için event listener'ları başlatır
-    initializeQuantityControls() {
-        const self = this;
-
-        // Miktar azaltma butonu için listener'lar
-        document.querySelectorAll('.quantity-decrease').forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.preventDefault();
-                const productId = this.getAttribute('data-product');
-                self.updateQuantity(productId, -1);
-            });
-        });
-
-        // Miktar artırma butonu için listener'lar
-        document.querySelectorAll('.quantity-increase').forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.preventDefault();
-                const productId = this.getAttribute('data-product');
-                self.updateQuantity(productId, 1);
-            });
-        });
-    }
-
-    // Miktar değerini input içinde güncelleyen yardımcı fonksiyon
-    updateQuantity(productId, change) {
-        const quantityInput = document.getElementById('quantity_' + productId);
-        if (quantityInput) {
-            let currentValue = parseInt(quantityInput.value) || 0;
-            const maxStock = parseInt(quantityInput.getAttribute('max')) || 1; 
-            let newValue = currentValue + change;
-            
-            // Alt limit kontrolü
-            if (newValue < 1) {
-                newValue = 1; 
-            }
-
-            // Üst limit (Stok) kontrolü
-            if (newValue > maxStock) {
-                newValue = maxStock;
-                this.showNotification(`Maksimum stok miktarı ${maxStock} adettir.`, 'warning');
-            }
-
-            // Input değerini güncelle
-            quantityInput.value = newValue;
-        }
-    }
-
-    // Sepete Ekleme Fonksiyonu
-    addToCart(productId, quantity = 1) {
-        let finalQuantity = parseInt(quantity);
-        if (isNaN(finalQuantity) || finalQuantity < 1) {
-            finalQuantity = 1;
-        }
-
-        const data = new URLSearchParams();
-        data.append('product_id', productId);
-        data.append('quantity', finalQuantity);
-
-        fetch('/api/add_to_cart.php', {
-            method: 'POST',
-            body: data,
-        })
-        .then(response => {
-            return response.text().then(text => {
-                try {
-                    return JSON.parse(text);
-                } catch (e) {
-                    console.error('AJAX Response Error: PHP JSON çıktısı bozuk. Ham yanıt:', text);
-                    this.showNotification('Sepete eklerken beklenmeyen bir sunucu hatası oluştu.', 'error');
-                    throw new Error('Invalid JSON response from server');
-                }
-            });
-        })
-        .then(data => {
-            if (data.success) {
-                this.showNotification(data.message, 'success');
-                if (data.cart_count !== undefined) {
-                    this.updateCartCount(data.cart_count);
-                }
-            } else {
-                this.showNotification(data.message, 'error');
-                if (data.message.includes('giriş yapın')) {
-                    window.location.href = '/login.php';
-                }
-            }
-        })
-        .catch(error => {
-            console.error('Sepete ekleme bağlantı/işlem hatası:', error);
-            this.showNotification('Bağlantı hatası oluştu veya geçersiz JSON yanıtı alındı.', 'error');
-        });
+        this.updateCartCount();
     }
 
     // Event Listeners
     initializeEventListeners() {
+        // Add to cart buttons
         document.addEventListener('click', (e) => {
-            // Add to cart buttons
             if (e.target.classList.contains('add-to-cart')) {
                 e.preventDefault();
                 const productId = e.target.getAttribute('data-product');
@@ -237,16 +73,6 @@ class KafkasBoyaApp {
                 e.preventDefault();
                 const targetId = e.target.getAttribute('href').substring(1);
                 this.smoothScrollTo(targetId);
-            }
-
-            // Single product add to cart
-            const singleProductCartButton = e.target.closest('#single-product-add-to-cart');
-            if (singleProductCartButton) {
-                e.preventDefault();
-                const productId = singleProductCartButton.getAttribute('data-product');
-                const quantityInput = document.getElementById('quantity_' + productId);
-                const quantity = quantityInput ? quantityInput.value : 1;
-                this.addToCart(productId, quantity);
             }
         });
 
@@ -356,8 +182,31 @@ class KafkasBoyaApp {
         this.renderCart();
     }
 
+    addToCart(productId) {
+        const product = this.getProductById(productId);
+        if (!product) return;
+
+        const existingItem = this.cart.find(item => item.id === productId);
+        
+        if (existingItem) {
+            existingItem.quantity += 1;
+        } else {
+            this.cart.push({
+                id: productId,
+                name: product.name,
+                price: product.price,
+                image: product.image,
+                quantity: 1
+            });
+        }
+
+        this.saveCart();
+        this.updateCartCount();
+        this.renderCart();
+        this.showNotification('Ürün sepete eklendi!', 'success');
+    }
+
     removeFromCart(productId) {
-        // TODO: AJAX ile /api/remove_from_cart.php'ye bağlanmalıdır
         this.cart = this.cart.filter(item => item.id !== productId);
         this.saveCart();
         this.updateCartCount();
@@ -365,7 +214,30 @@ class KafkasBoyaApp {
         this.showNotification('Ürün sepetten kaldırıldı!', 'info');
     }
 
+    updateQuantity(productId, change) {
+        const item = this.cart.find(item => item.id === productId);
+        if (item) {
+            item.quantity += change;
+            if (item.quantity <= 0) {
+                this.removeFromCart(productId);
+            } else {
+                this.saveCart();
+                this.renderCart();
+            }
+        }
+    }
+
+    updateCartCount() {
+        const cartCount = document.getElementById('cart-count');
+        if (cartCount) {
+            const totalItems = this.cart.reduce((sum, item) => sum + item.quantity, 0);
+            cartCount.textContent = totalItems;
+            cartCount.style.display = totalItems > 0 ? 'block' : 'none';
+        }
+    }
+
     renderCart() {
+        // Cart rendering logic for cart page
         const cartContainer = document.getElementById('cart-items');
         if (!cartContainer) return;
 
@@ -440,6 +312,7 @@ class KafkasBoyaApp {
     }
 
     renderWishlist() {
+        // Wishlist rendering logic
         const wishlistContainer = document.getElementById('wishlist-items');
         if (!wishlistContainer) return;
 
@@ -519,7 +392,10 @@ class KafkasBoyaApp {
 
     performGlobalSearch(query) {
         if (query.length < 3) return;
+
+        // Simulate search results
         console.log('Searching for:', query);
+        // In real application, this would make an API call
     }
 
     // Scroll Effects
@@ -574,7 +450,7 @@ class KafkasBoyaApp {
     smoothScrollTo(targetId) {
         const targetElement = document.getElementById(targetId);
         if (targetElement) {
-            const offsetTop = targetElement.offsetTop - 80;
+            const offsetTop = targetElement.offsetTop - 80; // Account for fixed navbar
             window.scrollTo({
                 top: offsetTop,
                 behavior: 'smooth'
@@ -589,11 +465,45 @@ class KafkasBoyaApp {
         }
     }
 
+    showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type} position-fixed top-0 end-0 m-3 z-index-3 slide-up`;
+        notification.style.minWidth = '300px';
+        notification.innerHTML = `
+            <div class="d-flex align-items-center">
+                <i class="fas fa-${this.getNotificationIcon(type)} me-2"></i>
+                <span>${message}</span>
+                <button type="button" class="btn-close ms-auto" onclick="this.parentElement.parentElement.remove()"></button>
+            </div>
+        `;
+
+        document.body.appendChild(notification);
+
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 5000);
+    }
+
+    getNotificationIcon(type) {
+        const icons = {
+            success: 'check-circle',
+            error: 'exclamation-circle',
+            warning: 'exclamation-triangle',
+            info: 'info-circle'
+        };
+        return icons[type] || icons.info;
+    }
+
     // Form Handlers
     handleContactForm(form) {
         const formData = new FormData(form);
         const data = Object.fromEntries(formData);
         
+        // Simulate form submission
         this.showNotification('Mesajınız başarıyla gönderildi!', 'success');
         form.reset();
     }
@@ -601,6 +511,7 @@ class KafkasBoyaApp {
     handleNewsletterForm(form) {
         const email = form.querySelector('input[type="email"]').value;
         
+        // Simulate newsletter subscription
         this.showNotification('E-bültene abone oldunuz!', 'success');
         form.reset();
     }
@@ -612,25 +523,25 @@ class KafkasBoyaApp {
                 id: 'polisan-premium',
                 name: 'Polisan Premium İç Cephe',
                 price: 899,
-                image: 'https://via.placeholder.com/300x300/667eea/ffffff?text=Polisan'
+                image: 'https://via.placeholder.com/300x300/007bff/ffffff?text=Polisan'
             },
             'filli-renk-paleti': {
                 id: 'filli-renk-paleti',
                 name: 'Filli Boya Renk Paleti',
                 price: 459,
-                image: 'https://via.placeholder.com/300x300/10b981/ffffff?text=Filli'
+                image: 'https://via.placeholder.com/300x300/28a745/ffffff?text=Filli'
             },
             'marshall-dis-cephe': {
                 id: 'marshall-dis-cephe',
                 name: 'Marshall Dış Cephe',
                 price: 1299,
-                image: 'https://via.placeholder.com/300x300/f59e0b/ffffff?text=Marshall'
+                image: 'https://via.placeholder.com/300x300/ffc107/ffffff?text=Marshall'
             },
             'dyo-eko-serisi': {
                 id: 'dyo-eko-serisi',
                 name: 'DYO Eko Serisi',
                 price: 649,
-                image: 'https://via.placeholder.com/300x300/ef4444/ffffff?text=DYO'
+                image: 'https://via.placeholder.com/300x300/dc3545/ffffff?text=DYO'
             }
         };
 
@@ -650,6 +561,22 @@ class KafkasBoyaApp {
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.kafkasApp = new KafkasBoyaApp();
+    
+    // Splide slider initialization for popular products
+    if (typeof Splide !== 'undefined') {
+        new Splide('.splide', {
+            type: 'slide',
+            perPage: 4,
+            perMove: 1,
+            gap: '1rem',
+            pagination: false,
+            breakpoints: {
+                1200: { perPage: 3 },
+                768: { perPage: 2 },
+                576: { perPage: 1 }
+            }
+        }).mount();
+    }
 });
 
 // Back to top functionality

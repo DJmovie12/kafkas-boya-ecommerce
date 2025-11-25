@@ -9,7 +9,7 @@ $search_query = isset($_GET['ara']) ? trim($_GET['ara']) : '';
 $sort = isset($_GET['sirala']) ? trim($_GET['sirala']) : 'default';
 
 // SQL sorgusu oluştur - JOIN ifadelerini düzelt
-$sql = "SELECT p.*, b.name as brand_name, c.name as category_name 
+$sql = "SELECT p.*, b.NAME as brand_name, c.name as category_name 
         FROM products p 
         LEFT JOIN brands b ON p.brand_id = b.id 
         LEFT JOIN categories c ON p.category_id = c.id 
@@ -86,7 +86,7 @@ $categories_result = $conn->query("SELECT DISTINCT name FROM categories ORDER BY
 $categories = $categories_result->fetch_all(MYSQLI_ASSOC);
 ?>
     <!-- Page Header -->
-    <section class="page-header bg-light py-5" style="margin-top: 76px;">
+    <section class="page-header bg-light py-5" style="margin-top: 70px;">
         <div class="container">
             <div class="row align-items-center">
                 <div class="col-lg-8">

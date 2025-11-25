@@ -1,16 +1,16 @@
 <?php
-require_once __DIR__ . '/db_connect.php';
+// require_once __DIR__ . '/db_connect.php'; // Eğer header ana dizinde değilse, bu yolları ayarlayın.
+// require_once __DIR__ . '/session.php';  // Eğer header ana dizinde değilse, bu yolları ayarlayın.
+require_once __DIR__ . '/db_connect.php'; 
 require_once __DIR__ . '/session.php';
-
 // Sepet sayısını al
 $cart_count = 0;
-if (isUserLoggedIn()) {
+if (isUserLoggedIn() && isset($conn) && $conn) {
     $user_id = $_SESSION['user_id'];
-    $cart_result = $conn->query("SELECT SUM(quantity) as total FROM cart WHERE user_id = $user_id");
-    if ($cart_result) {
-        $cart_row = $cart_result->fetch_assoc();
-        $cart_count = $cart_row['total'] ?? 0;
-    }
+    
+    // GÜVENLİ SORGULAMA: getCartItemCount fonksiyonu session.php'ye taşındığı için onu çağırıyoruz
+    // NOT: Eğer getCartItemCount, session.php'de değilse, yukarıdaki session.php kodunu kullandığınızdan emin olun.
+    $cart_count = getCartItemCount($user_id, $conn);
 }
 ?>
 <!DOCTYPE html>

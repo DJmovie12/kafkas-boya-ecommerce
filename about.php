@@ -4,7 +4,7 @@ require_once 'includes/header.php';
 ?>
 
     <!-- Page Header -->
-    <section class="page-header bg-light py-5" style="margin-top: 76px;">
+    <section class="page-header bg-light py-5" style="margin-top: 70px;">
         <div class="container">
             <div class="row align-items-center">
                 <div class="col-lg-8">
@@ -30,7 +30,7 @@ require_once 'includes/header.php';
             <div class="row g-5 align-items-center">
                 <div class="col-lg-6" data-aos="fade-right">
                     <div class="about-image">
-                        <img src="assets/img/about-hero.jpg" alt="Kafkas Boya" class="img-fluid rounded-4 shadow-lg">
+                        <img src="assets/img/banner_img_01.webp" alt="Kafkas Boya" class="img-fluid rounded-4 shadow-lg">
                     </div>
                 </div>
                 <div class="col-lg-6" data-aos="fade-left">

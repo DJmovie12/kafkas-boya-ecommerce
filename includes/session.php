@@ -1,7 +1,7 @@
 <?php
 /**
  * Kafkas Boya E-Ticaret Sitesi
- * Oturum Yönetimi
+ * Oturum Yönetimi ve Utility Fonksiyonları
  */
 
 session_start();
@@ -65,9 +65,25 @@ function generateCSRFToken() {
     return $_SESSION['csrf_token'];
 }
 
-// CSRF Token Kontrol Et
-function verifyCSRFToken($token) {
-    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
+/**
+ * Kullanıcının toplam sepet öğesi sayısını döndürür.
+ * @param int $user_id
+ * @param mysqli $conn
+ * @return int
+ */
+function getCartItemCount($user_id, $conn) {
+    if (!isset($conn) || !$conn) {
+        return 0; // Bağlantı yoksa 0 döndür
+    }
+    $count = 0;
+    // Prepared statement ile güvenli sorgu
+    if ($stmt = $conn->prepare("SELECT SUM(quantity) as total FROM cart WHERE user_id = ?")) {
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        $count = $row['total'] ?? 0;
+        $stmt->close();
+    }
+    return $count;
 }
-
-?>

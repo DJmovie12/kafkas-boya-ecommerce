@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 
     <!-- Page Header -->
-    <section class="page-header bg-light py-5" style="margin-top: 76px;">
+    <section class="page-header bg-light py-5" style="margin-top: 70px;">
         <div class="container">
             <div class="row align-items-center">
                 <div class="col-lg-8">

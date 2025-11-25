@@ -101,18 +101,19 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ürün Yönetimi - Admin Paneli</title>
     
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <style>
-        body {
-            background-color: #f8f9fa;
+        body { 
+            background-color: #f8f9fa; 
+            font-family: 'Inter', sans-serif; 
         }
         
         .sidebar {
@@ -128,9 +129,10 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
         
         .sidebar .nav-link {
             color: rgba(255,255,255,0.8);
-            padding: 15px 20px;
+            padding: 12px 20px;
             border-left: 3px solid transparent;
             transition: all 0.3s ease;
+            margin-bottom: 5px;
         }
         
         .sidebar .nav-link:hover,
@@ -140,9 +142,9 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
             border-left-color: white;
         }
         
-        .main-content {
-            margin-left: 250px;
-            padding: 30px;
+        .main-content { 
+            margin-left: 250px; 
+            padding: 30px; 
         }
         
         .top-navbar {
@@ -189,7 +191,7 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
         }
         
         .btn-primary:hover {
-            background: linear-gradient(135deg, #5568d3 0%, #6a3f91 100%);
+            background: linear-gradient(135deg, #5a6fd6 0%, #6c4596 100%);
         }
         
         .table-hover tbody tr:hover {
@@ -198,6 +200,7 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
     </style>
 </head>
 <body>
+
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="text-center mb-4 px-3">
@@ -206,28 +209,14 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
         </div>
         
         <nav class="nav flex-column">
-            <a href="/admin/dashboard.php" class="nav-link">
-                <i class="fas fa-chart-line me-2"></i>Dashboard
-            </a>
-            <a href="/admin/products.php" class="nav-link active">
-                <i class="fas fa-boxes me-2"></i>Ürünler
-            </a>
-            <a href="/admin/categories.php" class="nav-link">
-                <i class="fas fa-list me-2"></i>Kategoriler
-            </a>
-            <a href="/admin/brands.php" class="nav-link">
-                <i class="fas fa-tag me-2"></i>Markalar
-            </a>
-            <a href="/admin/orders.php" class="nav-link">
-                <i class="fas fa-receipt me-2"></i>Siparişler
-            </a>
-            <a href="/admin/users.php" class="nav-link">
-                <i class="fas fa-users me-2"></i>Kullanıcılar
-            </a>
-            <hr class="bg-white-50">
-            <a href="/logout.php" class="nav-link">
-                <i class="fas fa-sign-out-alt me-2"></i>Çıkış Yap
-            </a>
+            <a href="dashboard.php" class="nav-link"><i class="fas fa-chart-line me-2" style="width:20px"></i> Dashboard</a>
+            <a href="products.php" class="nav-link active"><i class="fas fa-boxes me-2" style="width:20px"></i> Ürünler</a>
+            <a href="categories.php" class="nav-link"><i class="fas fa-list me-2" style="width:20px"></i> Kategoriler</a>
+            <a href="brands.php" class="nav-link"><i class="fas fa-tag me-2" style="width:20px"></i> Markalar</a>
+            <a href="orders.php" class="nav-link"><i class="fas fa-receipt me-2" style="width:20px"></i> Siparişler</a>
+            <a href="users.php" class="nav-link"><i class="fas fa-users me-2" style="width:20px"></i> Kullanıcılar</a>
+            <hr class="bg-white-50 mx-3">
+            <a href="/logout.php" class="nav-link"><i class="fas fa-sign-out-alt me-2" style="width:20px"></i> Çıkış Yap</a>
         </nav>
     </div>
 
@@ -236,6 +225,9 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
         <h4 class="mb-0 fw-bold">Ürün Yönetimi</h4>
         <div class="d-flex align-items-center gap-3">
             <span class="text-muted"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
+            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                <i class="fas fa-user"></i>
+            </div>
         </div>
     </div>
 
@@ -243,14 +235,14 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
     <div class="main-content">
         <?php if ($error): ?>
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <i class="fas fa-exclamation-circle me-2"></i><?php echo htmlspecialchars($error); ?>
+                <?php echo htmlspecialchars($error); ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         <?php endif; ?>
 
         <?php if ($success): ?>
             <div class="alert alert-success alert-dismissible fade show" role="alert">
-                <i class="fas fa-check-circle me-2"></i><?php echo htmlspecialchars($success); ?>
+                <?php echo htmlspecialchars($success); ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         <?php endif; ?>
@@ -259,7 +251,7 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
         <?php if ($action === 'add' || $action === 'edit'): ?>
             <div class="card">
                 <div class="card-header">
-                    <h5 class="fw-bold mb-0">
+                    <h5 class="fw-bold mb-0 text-primary">
                         <?php echo $action === 'add' ? 'Yeni Ürün Ekle' : 'Ürünü Düzenle'; ?>
                     </h5>
                 </div>
@@ -268,18 +260,27 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="name" class="form-label fw-medium">Ürün Adı *</label>
-                                <input type="text" class="form-control" id="name" name="name" 
-                                    value="<?php echo htmlspecialchars($product['name'] ?? ''); ?>" required>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light"><i class="fas fa-box text-muted"></i></span>
+                                    <input type="text" class="form-control" id="name" name="name" 
+                                        value="<?php echo htmlspecialchars($product['name'] ?? ''); ?>" required>
+                                </div>
                             </div>
                             <div class="col-md-6">
                                 <label for="price" class="form-label fw-medium">Fiyat (₺) *</label>
-                                <input type="number" step="0.01" class="form-control" id="price" name="price" 
-                                    value="<?php echo htmlspecialchars($product['price'] ?? ''); ?>" required>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light"><i class="fas fa-lira-sign text-muted"></i></span>
+                                    <input type="number" step="0.01" class="form-control" id="price" name="price" 
+                                        value="<?php echo htmlspecialchars($product['price'] ?? ''); ?>" required>
+                                </div>
                             </div>
                             <div class="col-md-6">
                                 <label for="stock" class="form-label fw-medium">Stok *</label>
-                                <input type="number" class="form-control" id="stock" name="stock" 
-                                    value="<?php echo htmlspecialchars($product['stock'] ?? ''); ?>" required>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light"><i class="fas fa-cubes text-muted"></i></span>
+                                    <input type="number" class="form-control" id="stock" name="stock" 
+                                        value="<?php echo htmlspecialchars($product['stock'] ?? ''); ?>" required>
+                                </div>
                             </div>
                             <div class="col-md-6">
                                 <label for="brand_id" class="form-label fw-medium">Marka *</label>
@@ -307,8 +308,11 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
                             </div>
                             <div class="col-md-6">
                                 <label for="image" class="form-label fw-medium">Resim URL</label>
-                                <input type="url" class="form-control" id="image" name="image" 
-                                    value="<?php echo htmlspecialchars($product['image'] ?? ''); ?>">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light"><i class="fas fa-image text-muted"></i></span>
+                                    <input type="url" class="form-control" id="image" name="image" 
+                                        value="<?php echo htmlspecialchars($product['image'] ?? ''); ?>">
+                                </div>
                             </div>
                             <div class="col-12">
                                 <label for="description" class="form-label fw-medium">Açıklama</label>
@@ -332,51 +336,60 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
         <?php if ($action === 'list'): ?>
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="fw-bold mb-0">Ürün Listesi (<?php echo count($products); ?>)</h5>
-                    <a href="/admin/products.php?action=add" class="btn btn-primary btn-sm">
-                        <i class="fas fa-plus me-2"></i>Yeni Ürün Ekle
-                    </a>
+                    <h5 class="fw-bold mb-0">Mevcut Ürünler</h5>
+                    <span class="badge bg-primary rounded-pill"><?php echo count($products); ?> Kayıt</span>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0">
+                        <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
+                                    <th class="ps-4">ID</th>
                                     <th>Ürün Adı</th>
                                     <th>Marka</th>
                                     <th>Kategori</th>
                                     <th>Fiyat</th>
                                     <th>Stok</th>
-                                    <th>İşlemler</th>
+                                    <th class="text-end pe-4">İşlem</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($products as $prod): ?>
-                                    <tr>
-                                        <td><strong><?php echo htmlspecialchars($prod['name']); ?></strong></td>
-                                        <td><?php echo htmlspecialchars($prod['brand_name'] ?? '-'); ?></td>
-                                        <td><?php echo htmlspecialchars($prod['category_name'] ?? '-'); ?></td>
-                                        <td>₺<?php echo number_format($prod['price'], 2, ',', '.'); ?></td>
-                                        <td>
-                                            <?php if ($prod['stock'] > 0): ?>
-                                                <span class="badge bg-success"><?php echo $prod['stock']; ?></span>
-                                            <?php else: ?>
-                                                <span class="badge bg-danger">Stok Yok</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td>
-                                            <a href="/admin/products.php?action=edit&id=<?php echo $prod['id']; ?>" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            <a href="/admin/products.php?delete=<?php echo $prod['id']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Emin misiniz?')">
-                                                <i class="fas fa-trash"></i>
-                                            </a>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
+                                <?php if (count($products) > 0): ?>
+                                    <?php foreach ($products as $prod): ?>
+                                        <tr>
+                                            <td class="ps-4 fw-bold text-muted">#<?php echo $prod['id']; ?></td>
+                                            <td><strong><?php echo htmlspecialchars($prod['name']); ?></strong></td>
+                                            <td><?php echo htmlspecialchars($prod['brand_name'] ?? '-'); ?></td>
+                                            <td><?php echo htmlspecialchars($prod['category_name'] ?? '-'); ?></td>
+                                            <td><span class="fw-bold text-primary">₺<?php echo number_format($prod['price'], 2, ',', '.'); ?></span></td>
+                                            <td>
+                                                <?php if ($prod['stock'] > 0): ?>
+                                                    <span class="badge bg-success"><?php echo $prod['stock']; ?></span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-danger">Stok Yok</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-end pe-4">
+                                                <a href="/admin/products.php?action=edit&id=<?php echo $prod['id']; ?>" class="btn btn-sm btn-outline-primary" title="Düzenle">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <a href="/admin/products.php?delete=<?php echo $prod['id']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Bu ürünü silmek istediğinize emin misiniz?')" title="Sil">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr><td colspan="7" class="text-center py-5 text-muted">Henüz eklenmiş bir ürün yok.</td></tr>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
+                </div>
+                <div class="card-footer bg-white">
+                    <a href="/admin/products.php?action=add" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Yeni Ürün Ekle
+                    </a>
                 </div>
             </div>
         <?php endif; ?>

@@ -9,7 +9,7 @@ requireAdmin();
 $total_orders = $conn->query("SELECT COUNT(*) as count FROM orders")->fetch_assoc()['count'];
 $total_products = $conn->query("SELECT COUNT(*) as count FROM products")->fetch_assoc()['count'];
 $total_users = $conn->query("SELECT COUNT(*) as count FROM users WHERE role = 'user'")->fetch_assoc()['count'];
-$total_revenue = $conn->query("SELECT SUM(total_amount) as total FROM orders WHERE status = 'completed'")->fetch_assoc()['total'] ?? 0;
+$total_revenue = $conn->query("SELECT SUM(total_amount) as total FROM orders WHERE status = 'delivered'")->fetch_assoc()['total'] ?? 0;
 
 // Son siparişleri al
 $recent_orders = $conn->query("SELECT o.*, u.username, u.email FROM orders o 
@@ -28,10 +28,7 @@ $top_products = $conn->query("SELECT p.id, p.name, SUM(oi.quantity) as total_sol
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Paneli - Kafkas Boya</title>
-    
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>Dashboard - Admin Paneli</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -39,9 +36,13 @@ $top_products = $conn->query("SELECT p.id, p.name, SUM(oi.quantity) as total_sol
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <style>
-        body {
-            background-color: #f8f9fa;
+        body { 
+            background-color: #f8f9fa; 
+            font-family: 'Inter', sans-serif; 
         }
         
         .sidebar {
@@ -57,9 +58,10 @@ $top_products = $conn->query("SELECT p.id, p.name, SUM(oi.quantity) as total_sol
         
         .sidebar .nav-link {
             color: rgba(255,255,255,0.8);
-            padding: 15px 20px;
+            padding: 12px 20px;
             border-left: 3px solid transparent;
             transition: all 0.3s ease;
+            margin-bottom: 5px;
         }
         
         .sidebar .nav-link:hover,
@@ -69,9 +71,22 @@ $top_products = $conn->query("SELECT p.id, p.name, SUM(oi.quantity) as total_sol
             border-left-color: white;
         }
         
-        .main-content {
+        .main-content { 
+            margin-left: 250px; 
+            padding: 30px; 
+        }
+        
+        .top-navbar {
+            background: white;
+            padding: 15px 30px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-left: 250px;
-            padding: 30px;
+            position: sticky;
+            top: 0;
+            z-index: 999;
         }
         
         .stat-card {
@@ -81,6 +96,7 @@ $top_products = $conn->query("SELECT p.id, p.name, SUM(oi.quantity) as total_sol
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
             border-left: 4px solid #667eea;
             transition: all 0.3s ease;
+            margin-bottom: 30px;
         }
         
         .stat-card:hover {
@@ -101,19 +117,6 @@ $top_products = $conn->query("SELECT p.id, p.name, SUM(oi.quantity) as total_sol
             letter-spacing: 0.5px;
         }
         
-        .top-navbar {
-            background: white;
-            padding: 15px 30px;
-            border-bottom: 1px solid #e9ecef;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-left: 250px;
-            position: sticky;
-            top: 0;
-            z-index: 999;
-        }
-        
         .card {
             border: none;
             border-radius: 15px;
@@ -131,6 +134,15 @@ $top_products = $conn->query("SELECT p.id, p.name, SUM(oi.quantity) as total_sol
         .table-hover tbody tr:hover {
             background-color: #f8f9fa;
         }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #5a6fd6 0%, #6c4596 100%);
+        }
     </style>
 </head>
 <body>
@@ -142,28 +154,14 @@ $top_products = $conn->query("SELECT p.id, p.name, SUM(oi.quantity) as total_sol
         </div>
         
         <nav class="nav flex-column">
-            <a href="/admin/dashboard.php" class="nav-link active">
-                <i class="fas fa-chart-line me-2"></i>Dashboard
-            </a>
-            <a href="/admin/products.php" class="nav-link">
-                <i class="fas fa-boxes me-2"></i>Ürünler
-            </a>
-            <a href="/admin/categories.php" class="nav-link">
-                <i class="fas fa-list me-2"></i>Kategoriler
-            </a>
-            <a href="/admin/brands.php" class="nav-link">
-                <i class="fas fa-tag me-2"></i>Markalar
-            </a>
-            <a href="/admin/orders.php" class="nav-link">
-                <i class="fas fa-receipt me-2"></i>Siparişler
-            </a>
-            <a href="/admin/users.php" class="nav-link">
-                <i class="fas fa-users me-2"></i>Kullanıcılar
-            </a>
-            <hr class="bg-white-50">
-            <a href="/logout.php" class="nav-link">
-                <i class="fas fa-sign-out-alt me-2"></i>Çıkış Yap
-            </a>
+            <a href="dashboard.php" class="nav-link active"><i class="fas fa-chart-line me-2" style="width:20px"></i> Dashboard</a>
+            <a href="products.php" class="nav-link"><i class="fas fa-boxes me-2" style="width:20px"></i> Ürünler</a>
+            <a href="categories.php" class="nav-link"><i class="fas fa-list me-2" style="width:20px"></i> Kategoriler</a>
+            <a href="brands.php" class="nav-link"><i class="fas fa-tag me-2" style="width:20px"></i> Markalar</a>
+            <a href="orders.php" class="nav-link"><i class="fas fa-receipt me-2" style="width:20px"></i> Siparişler</a>
+            <a href="users.php" class="nav-link"><i class="fas fa-users me-2" style="width:20px"></i> Kullanıcılar</a>
+            <hr class="bg-white-50 mx-3">
+            <a href="/logout.php" class="nav-link"><i class="fas fa-sign-out-alt me-2" style="width:20px"></i> Çıkış Yap</a>
         </nav>
     </div>
 
@@ -172,7 +170,9 @@ $top_products = $conn->query("SELECT p.id, p.name, SUM(oi.quantity) as total_sol
         <h4 class="mb-0 fw-bold">Dashboard</h4>
         <div class="d-flex align-items-center gap-3">
             <span class="text-muted"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
-            <img src="https://via.placeholder.com/40" alt="Profile" class="rounded-circle" style="width: 40px; height: 40px;">
+            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                <i class="fas fa-user"></i>
+            </div>
         </div>
     </div>
 
@@ -206,67 +206,105 @@ $top_products = $conn->query("SELECT p.id, p.name, SUM(oi.quantity) as total_sol
             </div>
         </div>
 
-        <!-- Recent Orders -->
-        <div class="card">
-            <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="fw-bold mb-0">Son Siparişler</h5>
-                    <a href="/admin/orders.php" class="btn btn-sm btn-outline-primary">Tümünü Gör</a>
+        <div class="row g-4">
+            <!-- Recent Orders -->
+            <div class="col-md-8">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold mb-0">Son Siparişler</h5>
+                        <a href="/admin/orders.php" class="btn btn-sm btn-outline-primary">Tümünü Gör</a>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-4">Sipariş No</th>
+                                        <th>Müşteri</th>
+                                        <th>Tutar</th>
+                                        <th>Durum</th>
+                                        <th>Tarih</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (count($recent_orders) > 0): ?>
+                                        <?php foreach ($recent_orders as $order): ?>
+                                            <tr>
+                                                <td class="ps-4"><strong>#<?php echo str_pad($order['id'], 6, '0', STR_PAD_LEFT); ?></strong></td>
+                                                <td>
+                                                    <div class="fw-bold text-dark"><?php echo htmlspecialchars($order['username']); ?></div>
+                                                    <div class="text-muted small"><?php echo htmlspecialchars($order['email']); ?></div>
+                                                </td>
+                                                <td><span class="fw-bold text-primary">₺<?php echo number_format($order['total_amount'], 2, ',', '.'); ?></span></td>
+                                                <td>
+                                                    <?php 
+                                                    $statusClass = match($order['STATUS']) {
+                                                        'pending' => 'bg-warning text-dark',
+                                                        'processing' => 'bg-info text-white',
+                                                        'shipped' => 'bg-primary',
+                                                        'delivered' => 'bg-success',
+                                                        'cancelled' => 'bg-danger',
+                                                        default => 'bg-secondary'
+                                                    };
+                                                    
+                                                    $statusLabels = [
+                                                        'pending' => 'Bekliyor',
+                                                        'processing' => 'Hazırlanıyor',
+                                                        'shipped' => 'Kargolandı',
+                                                        'delivered' => 'Teslim Edildi',
+                                                        'cancelled' => 'İptal Edildi'
+                                                    ];
+                                                    ?>
+                                                    <span class="badge rounded-pill <?php echo $statusClass; ?>">
+                                                        <?php echo $statusLabels[$order['STATUS']] ?? $order['STATUS']; ?>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div class="text-dark"><?php echo date('d.m.Y', strtotime($order['created_at'])); ?></div>
+                                                    <div class="text-muted small"><?php echo date('H:i', strtotime($order['created_at'])); ?></div>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr><td colspan="5" class="text-center py-5 text-muted">Henüz sipariş bulunmuyor.</td></tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Sipariş No</th>
-                                <th>Müşteri</th>
-                                <th>Tutar</th>
-                                <th>Durum</th>
-                                <th>Tarih</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($recent_orders as $order): ?>
-                                <tr>
-                                    <td><strong>#<?php echo str_pad($order['id'], 6, '0', STR_PAD_LEFT); ?></strong></td>
-                                    <td><?php echo htmlspecialchars($order['username']); ?></td>
-                                    <td><strong>₺<?php echo number_format($order['total_amount'], 2, ',', '.'); ?></strong></td>
-                                    <td>
-                                        <span class="badge bg-warning">Beklemede</span>
-                                    </td>
-                                    <td><?php echo date('d.m.Y', strtotime($order['created_at'])); ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
 
-        <!-- Top Products -->
-        <div class="card">
-            <div class="card-header">
-                <h5 class="fw-bold mb-0">En Çok Satılan Ürünler</h5>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Ürün Adı</th>
-                                <th>Satış Miktarı</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($top_products as $product): ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($product['name']); ?></td>
-                                    <td><strong><?php echo $product['total_sold']; ?> adet</strong></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+            <!-- Top Products -->
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="fw-bold mb-0">En Çok Satılan Ürünler</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-4">Ürün Adı</th>
+                                        <th class="text-end pe-4">Satış Miktarı</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (count($top_products) > 0): ?>
+                                        <?php foreach ($top_products as $product): ?>
+                                            <tr>
+                                                <td class="ps-4"><strong><?php echo htmlspecialchars($product['name']); ?></strong></td>
+                                                <td class="text-end pe-4"><span class="badge bg-primary"><?php echo $product['total_sold']; ?> adet</span></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr><td colspan="2" class="text-center py-5 text-muted">Henüz satış verisi bulunmuyor.</td></tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
