@@ -2,119 +2,199 @@
 require_once '../includes/db_connect.php';
 require_once '../includes/session.php';
 
-// Admin kontrolü
-requireAdmin();
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+    header('Location: ../login.php');
+    exit();
+}
 
-$error = '';
-$success = '';
-$action = isset($_GET['action']) ? $_GET['action'] : 'list';
-$product_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-
-// Ürün ekleme/düzenleme işlemi
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name = trim($_POST['name'] ?? '');
-    $description = trim($_POST['description'] ?? '');
-    $price = floatval($_POST['price'] ?? 0);
-    $stock = intval($_POST['stock'] ?? 0);
-    $brand_id = intval($_POST['brand_id'] ?? 0);
-    $category_id = intval($_POST['category_id'] ?? 0);
-    $image = trim($_POST['image'] ?? '');
-
-    if (empty($name) || $price <= 0 || $brand_id === 0 || $category_id === 0) {
-        $error = 'Tüm alanlar gereklidir ve fiyat 0\'dan büyük olmalıdır.';
-    } else {
-        if ($action === 'add') {
-            // Yeni ürün ekle
-            $stmt = $conn->prepare("INSERT INTO products (name, description, price, stock, brand_id, category_id, image) 
-                                   VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("ssdiis", $name, $description, $price, $stock, $brand_id, $category_id, $image);
+// Ürün ekleme işlemi
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] === 'add') {
+    $name = $_POST['name'];
+    $description = $_POST['description'];
+    $price = $_POST['price'];
+    $stock = $_POST['stock'];
+    $brand_id = $_POST['brand_id'];
+    $category_id = $_POST['category_id'];
+    
+    // Fotoğraf yükleme işlemi
+    $image_path = null;
+    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = '../assets/img/products/';
+        
+        // Klasör yoksa oluştur
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
+        
+        $file_extension = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
+        $allowed_extensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+        
+        if (in_array($file_extension, $allowed_extensions)) {
+            // Benzersiz dosya adı oluştur
+            $new_filename = 'product_' . time() . '_' . uniqid() . '.' . $file_extension;
+            $upload_path = $upload_dir . $new_filename;
             
-            if ($stmt->execute()) {
-                $success = 'Ürün başarıyla eklendi.';
-                $action = 'list';
+            if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_path)) {
+                $image_path = 'assets/img/products/' . $new_filename;
             } else {
-                $error = 'Ürün eklenirken hata oluştu.';
+                $_SESSION['error'] = 'Dosya yüklenirken hata oluştu!';
             }
+        } else {
+            $_SESSION['error'] = 'Geçersiz dosya türü! Sadece JPG, PNG, WEBP veya GIF yükleyebilirsiniz.';
+        }
+    }
+    
+    if (!isset($_SESSION['error'])) {
+        try {
+            $stmt = $conn->prepare("
+                INSERT INTO products (name, description, price, stock, brand_id, category_id, image) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->bind_param("ssdiiss", $name, $description, $price, $stock, $brand_id, $category_id, $image_path);
+            $stmt->execute();
             $stmt->close();
-        } elseif ($action === 'edit' && $product_id > 0) {
-            // Ürünü güncelle
-            $stmt = $conn->prepare("UPDATE products SET name = ?, description = ?, price = ?, stock = ?, brand_id = ?, category_id = ?, image = ? 
-                                   WHERE id = ?");
-            $stmt->bind_param("ssdiissi", $name, $description, $price, $stock, $brand_id, $category_id, $image, $product_id);
             
-            if ($stmt->execute()) {
-                $success = 'Ürün başarıyla güncellendi.';
-                $action = 'list';
-            } else {
-                $error = 'Ürün güncellenirken hata oluştu.';
-            }
-            $stmt->close();
+            $_SESSION['success'] = 'Ürün başarıyla eklendi!';
+            header('Location: products.php');
+            exit();
+        } catch (Exception $e) {
+            $_SESSION['error'] = 'Ürün eklenirken hata oluştu: ' . $e->getMessage();
         }
     }
 }
 
-// Ürün silme işlemi
-if (isset($_GET['delete']) && intval($_GET['delete']) > 0) {
-    $delete_id = intval($_GET['delete']);
-    $stmt = $conn->prepare("DELETE FROM products WHERE id = ?");
-    $stmt->bind_param("i", $delete_id);
+// Ürün düzenleme işlemi
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] === 'edit') {
+    $id = $_POST['id'];
+    $name = $_POST['name'];
+    $description = $_POST['description'];
+    $price = $_POST['price'];
+    $stock = $_POST['stock'];
+    $brand_id = $_POST['brand_id'];
+    $category_id = $_POST['category_id'];
     
-    if ($stmt->execute()) {
-        $success = 'Ürün başarıyla silindi.';
-    } else {
-        $error = 'Ürün silinirken hata oluştu.';
-    }
+    // Mevcut resmi al
+    $stmt = $conn->prepare("SELECT image FROM products WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $current_product = $result->fetch_assoc();
     $stmt->close();
-    $action = 'list';
+    
+    $image_path = $current_product['image'];
+    
+    // Yeni fotoğraf yüklendiyse
+    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = '../assets/img/products/';
+        
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
+        
+        $file_extension = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
+        $allowed_extensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+        
+        if (in_array($file_extension, $allowed_extensions)) {
+            $new_filename = 'product_' . time() . '_' . uniqid() . '.' . $file_extension;
+            $upload_path = $upload_dir . $new_filename;
+            
+            if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_path)) {
+                // Eski dosyayı sil
+                if ($image_path && file_exists('../' . $image_path)) {
+                    unlink('../' . $image_path);
+                }
+                $image_path = 'assets/img/products/' . $new_filename;
+            }
+        }
+    }
+    
+    try {
+        $stmt = $conn->prepare("
+            UPDATE products 
+            SET name = ?, description = ?, price = ?, stock = ?, brand_id = ?, category_id = ?, image = ? 
+            WHERE id = ?
+        ");
+        $stmt->bind_param("ssdiissi", $name, $description, $price, $stock, $brand_id, $category_id, $image_path, $id);
+        $stmt->execute();
+        $stmt->close();
+        
+        $_SESSION['success'] = 'Ürün başarıyla güncellendi!';
+        header('Location: products.php');
+        exit();
+    } catch (Exception $e) {
+        $_SESSION['error'] = 'Ürün güncellenirken hata oluştu: ' . $e->getMessage();
+    }
 }
 
-// Tüm ürünleri al
-$products = [];
-if ($action === 'list') {
-    $result = $conn->query("SELECT p.*, b.name as brand_name, c.name as category_name 
-                           FROM products p 
-                           LEFT JOIN brands b ON p.brand_id = b.id 
-                           LEFT JOIN categories c ON p.category_id = c.id 
-                           ORDER BY p.created_at DESC");
-    $products = $result->fetch_all(MYSQLI_ASSOC);
-}
-
-// Ürünü düzenlemek için al
-$product = null;
-if ($action === 'edit' && $product_id > 0) {
-    $stmt = $conn->prepare("SELECT * FROM products WHERE id = ?");
-    $stmt->bind_param("i", $product_id);
+// Ürün silme işlemi
+if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
+    $id = $_GET['id'];
+    
+    // Ürün resmini al
+    $stmt = $conn->prepare("SELECT image FROM products WHERE id = ?");
+    $stmt->bind_param("i", $id);
     $stmt->execute();
     $result = $stmt->get_result();
     $product = $result->fetch_assoc();
     $stmt->close();
+    
+    // Ürünü sil
+    $stmt = $conn->prepare("DELETE FROM products WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $stmt->close();
+    
+    // Resmi sil
+    if ($product && $product['image'] && file_exists('../' . $product['image'])) {
+        unlink('../' . $product['image']);
+    }
+    
+    $_SESSION['success'] = 'Ürün başarıyla silindi!';
+    header('Location: products.php');
+    exit();
 }
 
-// Markaları ve kategorileri al
-$brands = $conn->query("SELECT * FROM brands ORDER BY name")->fetch_all(MYSQLI_ASSOC);
-$categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+// Markaları ve kategorileri çek
+$brands_result = $conn->query("SELECT * FROM brands ORDER BY name");
+$brands = $brands_result->fetch_all(MYSQLI_ASSOC);
+$brands_result->free();
+
+$categories_result = $conn->query("SELECT * FROM categories ORDER BY name");
+$categories = $categories_result->fetch_all(MYSQLI_ASSOC);
+$categories_result->free();
+
+// Ürünleri listele
+$products_result = $conn->query("
+    SELECT p.*, b.name as brand_name, c.name as category_name 
+    FROM products p 
+    LEFT JOIN brands b ON p.brand_id = b.id 
+    LEFT JOIN categories c ON p.category_id = c.id 
+    ORDER BY p.created_at DESC
+");
+$products = $products_result->fetch_all(MYSQLI_ASSOC);
+$products_result->free();
+
+// Düzenlenecek ürün varsa bilgilerini al
+$edit_product = null;
+if (isset($_GET['action']) && $_GET['action'] === 'edit' && isset($_GET['id'])) {
+    $stmt = $conn->prepare("SELECT * FROM products WHERE id = ?");
+    $stmt->bind_param("i", $_GET['id']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $edit_product = $result->fetch_assoc();
+    $stmt->close();
+}
 ?>
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ürün Yönetimi - Admin Paneli</title>
-    
-    <!-- Bootstrap CSS -->
+    <title><?php echo $page_title; ?> - Admin Paneli</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
     <style>
-        body { 
-            background-color: #f8f9fa; 
-            font-family: 'Inter', sans-serif; 
-        }
+        body { background-color: #f8f9fa; font-family: 'Inter', sans-serif; }
         
         .sidebar {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -142,10 +222,7 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
             border-left-color: white;
         }
         
-        .main-content { 
-            margin-left: 250px; 
-            padding: 30px; 
-        }
+        .main-content { margin-left: 250px; padding: 30px; }
         
         .top-navbar {
             background: white;
@@ -160,43 +237,14 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
             z-index: 999;
         }
         
-        .card {
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            margin-bottom: 30px;
-        }
+        .card { border: none; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 30px; }
+        .card-header { background: white; border-bottom: 1px solid #e9ecef; padding: 20px; border-radius: 15px 15px 0 0; }
         
-        .card-header {
-            background: white;
-            border-bottom: 1px solid #e9ecef;
-            padding: 20px;
-            border-radius: 15px 15px 0 0;
-        }
+        .form-control:focus { border-color: #667eea; box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25); }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; }
+        .btn-primary:hover { background: linear-gradient(135deg, #5a6fd6 0%, #6c4596 100%); transform: translateY(-2px); }
         
-        .form-control, .form-select {
-            border-radius: 10px;
-            border: 1px solid #e9ecef;
-        }
-        
-        .form-control:focus, .form-select:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            border-radius: 10px;
-        }
-        
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #5a6fd6 0%, #6c4596 100%);
-        }
-        
-        .table-hover tbody tr:hover {
-            background-color: #f8f9fa;
-        }
+        .table-hover tbody tr:hover { background-color: #f8f9fa; }
     </style>
 </head>
 <body>
@@ -210,8 +258,8 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
         
         <nav class="nav flex-column">
             <a href="dashboard.php" class="nav-link"><i class="fas fa-chart-line me-2" style="width:20px"></i> Dashboard</a>
-            <a href="products.php" class="nav-link active"><i class="fas fa-boxes me-2" style="width:20px"></i> Ürünler</a>
-            <a href="categories.php" class="nav-link"><i class="fas fa-list me-2" style="width:20px"></i> Kategoriler</a>
+            <a href="products.php" class="nav-link"><i class="fas fa-boxes me-2" style="width:20px"></i> Ürünler</a>
+            <a href="categories.php" class="nav-link active"><i class="fas fa-list me-2" style="width:20px"></i> Kategoriler</a>
             <a href="brands.php" class="nav-link"><i class="fas fa-tag me-2" style="width:20px"></i> Markalar</a>
             <a href="orders.php" class="nav-link"><i class="fas fa-receipt me-2" style="width:20px"></i> Siparişler</a>
             <a href="users.php" class="nav-link"><i class="fas fa-users me-2" style="width:20px"></i> Kullanıcılar</a>
@@ -219,183 +267,202 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(
             <a href="/logout.php" class="nav-link"><i class="fas fa-sign-out-alt me-2" style="width:20px"></i> Çıkış Yap</a>
         </nav>
     </div>
-
-    <!-- Top Navbar -->
-    <div class="top-navbar">
-        <h4 class="mb-0 fw-bold">Ürün Yönetimi</h4>
-        <div class="d-flex align-items-center gap-3">
-            <span class="text-muted"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
-            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                <i class="fas fa-user"></i>
+        
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">Ürün Yönetimi</h1>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                    Yeni Ürün Ekle
+                </button>
             </div>
-        </div>
+            
+            <?php if (isset($_SESSION['error'])): ?>
+                <div class="alert alert-danger">
+                    <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
+                </div>
+            <?php endif; ?>
+            
+            <?php if (isset($_SESSION['success'])): ?>
+                <div class="alert alert-success">
+                    <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
+                </div>
+            <?php endif; ?>
+            
+            <div class="table-responsive">
+                <table class="table table-striped table-sm">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Resim</th>
+                            <th>Ürün Adı</th>
+                            <th>Marka</th>
+                            <th>Kategori</th>
+                            <th>Fiyat</th>
+                            <th>Stok</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($products as $product): ?>
+                            <tr>
+                                <td><?php echo $product['id']; ?></td>
+                                <td>
+                                    <?php if ($product['image']): ?>
+                                        <img src="../<?php echo htmlspecialchars($product['image']); ?>" 
+                                             alt="" style="width: 50px; height: 50px; object-fit: cover;">
+                                    <?php else: ?>
+                                        <span class="text-muted">Resim yok</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?php echo htmlspecialchars($product['name']); ?></td>
+                                <td><?php echo htmlspecialchars($product['brand_name']); ?></td>
+                                <td><?php echo htmlspecialchars($product['category_name']); ?></td>
+                                <td>₺<?php echo number_format($product['price'], 2); ?></td>
+                                <td>
+                                    <span class="badge bg-<?php echo $product['stock'] > 10 ? 'success' : ($product['stock'] > 0 ? 'warning' : 'danger'); ?>">
+                                        <?php echo $product['stock']; ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="?action=edit&id=<?php echo $product['id']; ?>" class="btn btn-sm btn-warning">Düzenle</a>
+                                    <a href="?action=delete&id=<?php echo $product['id']; ?>" 
+                                       class="btn btn-sm btn-danger" 
+                                       onclick="return confirm('Bu ürünü silmek istediğinizden emin misiniz?')">Sil</a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </main>
     </div>
+</div>
 
-    <!-- Main Content -->
-    <div class="main-content">
-        <?php if ($error): ?>
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <?php echo htmlspecialchars($error); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        <?php endif; ?>
-
-        <?php if ($success): ?>
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                <?php echo htmlspecialchars($success); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        <?php endif; ?>
-
-        <!-- Add/Edit Product Form -->
-        <?php if ($action === 'add' || $action === 'edit'): ?>
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="fw-bold mb-0 text-primary">
-                        <?php echo $action === 'add' ? 'Yeni Ürün Ekle' : 'Ürünü Düzenle'; ?>
-                    </h5>
+<!-- Ürün Ekleme Modal -->
+<div class="modal fade" id="addProductModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="?action=add" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title">Yeni Ürün Ekle</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="card-body">
-                    <form method="POST">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label for="name" class="form-label fw-medium">Ürün Adı *</label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-light"><i class="fas fa-box text-muted"></i></span>
-                                    <input type="text" class="form-control" id="name" name="name" 
-                                        value="<?php echo htmlspecialchars($product['name'] ?? ''); ?>" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="price" class="form-label fw-medium">Fiyat (₺) *</label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-light"><i class="fas fa-lira-sign text-muted"></i></span>
-                                    <input type="number" step="0.01" class="form-control" id="price" name="price" 
-                                        value="<?php echo htmlspecialchars($product['price'] ?? ''); ?>" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="stock" class="form-label fw-medium">Stok *</label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-light"><i class="fas fa-cubes text-muted"></i></span>
-                                    <input type="number" class="form-control" id="stock" name="stock" 
-                                        value="<?php echo htmlspecialchars($product['stock'] ?? ''); ?>" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="brand_id" class="form-label fw-medium">Marka *</label>
-                                <select class="form-select" id="brand_id" name="brand_id" required>
-                                    <option value="">Seçiniz</option>
-                                    <?php foreach ($brands as $brand): ?>
-                                        <option value="<?php echo $brand['id']; ?>" 
-                                            <?php echo (isset($product['brand_id']) && $product['brand_id'] == $brand['id']) ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($brand['name']); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="category_id" class="form-label fw-medium">Kategori *</label>
-                                <select class="form-select" id="category_id" name="category_id" required>
-                                    <option value="">Seçiniz</option>
-                                    <?php foreach ($categories as $category): ?>
-                                        <option value="<?php echo $category['id']; ?>" 
-                                            <?php echo (isset($product['category_id']) && $product['category_id'] == $category['id']) ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($category['name']); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="image" class="form-label fw-medium">Resim URL</label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-light"><i class="fas fa-image text-muted"></i></span>
-                                    <input type="url" class="form-control" id="image" name="image" 
-                                        value="<?php echo htmlspecialchars($product['image'] ?? ''); ?>">
-                                </div>
-                            </div>
-                            <div class="col-12">
-                                <label for="description" class="form-label fw-medium">Açıklama</label>
-                                <textarea class="form-control" id="description" name="description" rows="4"><?php echo htmlspecialchars($product['description'] ?? ''); ?></textarea>
-                            </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Ürün Adı</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Açıklama</label>
+                        <textarea name="description" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Fiyat (₺)</label>
+                            <input type="number" name="price" class="form-control" step="0.01" required>
                         </div>
-                        <div class="mt-4">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-2"></i><?php echo $action === 'add' ? 'Ürün Ekle' : 'Güncelle'; ?>
-                            </button>
-                            <a href="/admin/products.php" class="btn btn-outline-secondary">
-                                <i class="fas fa-times me-2"></i>İptal
-                            </a>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Stok</label>
+                            <input type="number" name="stock" class="form-control" required>
                         </div>
-                    </form>
-                </div>
-            </div>
-        <?php endif; ?>
-
-        <!-- Products List -->
-        <?php if ($action === 'list'): ?>
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="fw-bold mb-0">Mevcut Ürünler</h5>
-                    <span class="badge bg-primary rounded-pill"><?php echo count($products); ?> Kayıt</span>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th class="ps-4">ID</th>
-                                    <th>Ürün Adı</th>
-                                    <th>Marka</th>
-                                    <th>Kategori</th>
-                                    <th>Fiyat</th>
-                                    <th>Stok</th>
-                                    <th class="text-end pe-4">İşlem</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (count($products) > 0): ?>
-                                    <?php foreach ($products as $prod): ?>
-                                        <tr>
-                                            <td class="ps-4 fw-bold text-muted">#<?php echo $prod['id']; ?></td>
-                                            <td><strong><?php echo htmlspecialchars($prod['name']); ?></strong></td>
-                                            <td><?php echo htmlspecialchars($prod['brand_name'] ?? '-'); ?></td>
-                                            <td><?php echo htmlspecialchars($prod['category_name'] ?? '-'); ?></td>
-                                            <td><span class="fw-bold text-primary">₺<?php echo number_format($prod['price'], 2, ',', '.'); ?></span></td>
-                                            <td>
-                                                <?php if ($prod['stock'] > 0): ?>
-                                                    <span class="badge bg-success"><?php echo $prod['stock']; ?></span>
-                                                <?php else: ?>
-                                                    <span class="badge bg-danger">Stok Yok</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td class="text-end pe-4">
-                                                <a href="/admin/products.php?action=edit&id=<?php echo $prod['id']; ?>" class="btn btn-sm btn-outline-primary" title="Düzenle">
-                                                    <i class="fas fa-edit"></i>
-                                                </a>
-                                                <a href="/admin/products.php?delete=<?php echo $prod['id']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Bu ürünü silmek istediğinize emin misiniz?')" title="Sil">
-                                                    <i class="fas fa-trash-alt"></i>
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <tr><td colspan="7" class="text-center py-5 text-muted">Henüz eklenmiş bir ürün yok.</td></tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Marka</label>
+                            <select name="brand_id" class="form-select" required>
+                                <option value="">Seçiniz</option>
+                                <?php foreach ($brands as $brand): ?>
+                                    <option value="<?php echo $brand['id']; ?>"><?php echo htmlspecialchars($brand['name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Kategori</label>
+                        <select name="category_id" class="form-select" required>
+                            <option value="">Seçiniz</option>
+                            <?php foreach ($categories as $category): ?>
+                                <option value="<?php echo $category['id']; ?>"><?php echo htmlspecialchars($category['name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Ürün Resmi</label>
+                        <input type="file" name="image" class="form-control" accept="image/*">
+                        <small class="text-muted">JPG, PNG, WEBP veya GIF formatında resim yükleyebilirsiniz.</small>
                     </div>
                 </div>
-                <div class="card-footer bg-white">
-                    <a href="/admin/products.php?action=add" class="btn btn-primary">
-                        <i class="fas fa-plus me-2"></i>Yeni Ürün Ekle
-                    </a>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Ürün Düzenleme Formu -->
+<?php if ($edit_product): ?>
+<div class="card mt-4">
+    <div class="card-header">
+        <h5>Ürün Düzenle</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="?action=edit" enctype="multipart/form-data">
+            <input type="hidden" name="id" value="<?php echo $edit_product['id']; ?>">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Ürün Adı</label>
+                    <input type="text" name="name" class="form-control" value="<?php echo htmlspecialchars($edit_product['name']); ?>" required>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Fiyat (₺)</label>
+                    <input type="number" name="price" class="form-control" step="0.01" value="<?php echo $edit_product['price']; ?>" required>
                 </div>
             </div>
-        <?php endif; ?>
+            <div class="mb-3">
+                <label class="form-label">Açıklama</label>
+                <textarea name="description" class="form-control" rows="3"><?php echo htmlspecialchars($edit_product['description']); ?></textarea>
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Stok</label>
+                    <input type="number" name="stock" class="form-control" value="<?php echo $edit_product['stock']; ?>" required>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Marka</label>
+                    <select name="brand_id" class="form-select" required>
+                        <?php foreach ($brands as $brand): ?>
+                            <option value="<?php echo $brand['id']; ?>" <?php echo $brand['id'] == $edit_product['brand_id'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($brand['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Kategori</label>
+                    <select name="category_id" class="form-select" required>
+                        <?php foreach ($categories as $category): ?>
+                            <option value="<?php echo $category['id']; ?>" <?php echo $category['id'] == $edit_product['category_id'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($category['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Ürün Resmi</label>
+                <?php if ($edit_product['image']): ?>
+                    <div class="mb-2">
+                        <img src="../<?php echo htmlspecialchars($edit_product['image']); ?>" alt="" style="max-width: 200px;">
+                        <p class="text-muted">Mevcut resim</p>
+                    </div>
+                <?php endif; ?>
+                <input type="file" name="image" class="form-control" accept="image/*">
+                <small class="text-muted">Yeni resim yüklemek için seçin. Boş bırakılırsa mevcut resim korunur.</small>
+            </div>
+            <button type="submit" class="btn btn-primary">Güncelle</button>
+            <a href="products.php" class="btn btn-secondary">İptal</a>
+        </form>
     </div>
-
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+</div>
+<?php endif; ?>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

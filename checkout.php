@@ -1,36 +1,32 @@
 <?php
-// 1. ÖNCE MANTIK VE YÖNLENDİRMELER (HTML ÇIKTISI YOK)
+// checkout.php - session_start() satırını kaldırın veya değiştirin
 require_once 'includes/db_connect.php';
 require_once 'includes/session.php';
 
-$page_title = "Ödeme";
-
-// Giriş kontrolü
-if (!isUserLoggedIn()) {
-    // Giriş yapmamışsa login sayfasına yönlendir
-    header("Location: /login.php?redirect=checkout.php");
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
     exit();
 }
 
 $user_id = $_SESSION['user_id'];
-$error = '';
-$success = '';
 
-// Sepeti al
-// NOT: 'c.*' yerine 'c.quantity' gibi spesifik alanları seçmek daha iyidir, çakışmaları önler.
-$stmt = $conn->prepare("SELECT c.product_id, c.quantity, p.name, p.price 
-                        FROM cart c 
-                        JOIN products p ON c.product_id = p.id 
-                        WHERE c.user_id = ?");
+// Sepetteki ürünleri al
+$stmt = $conn->prepare("
+    SELECT c.*, p.price, p.stock, p.name, p.image
+    FROM cart c 
+    JOIN products p ON c.product_id = p.id 
+    WHERE c.user_id = ?
+");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $result = $stmt->get_result();
 $cart_items = $result->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-// Sepet boşsa yönlendir
+// Sepet boşsa cart.php'ye yönlendir
 if (empty($cart_items)) {
-    header("Location: /cart.php");
+    $_SESSION['error'] = 'Sepetiniz boş!';
+    header('Location: cart.php');
     exit();
 }
 
@@ -39,72 +35,98 @@ $subtotal = 0;
 foreach ($cart_items as $item) {
     $subtotal += $item['price'] * $item['quantity'];
 }
-$tax = $subtotal * 0.18;
+$tax = $subtotal * 0.18; // %18 KDV
 $total = $subtotal + $tax;
 
-// Sipariş oluşturma işlemi (POST isteği)
+$error = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $full_name = trim($_POST['full_name'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $phone = trim($_POST['phone'] ?? '');
-    $address = trim($_POST['address'] ?? '');
-    $city = trim($_POST['city'] ?? '');
-    $postal_code = trim($_POST['postal_code'] ?? '');
-    $payment_method = trim($_POST['payment_method'] ?? '');
-
-    // Validasyon
-    if (empty($full_name) || empty($email) || empty($phone) || empty($address) || empty($city) || empty($postal_code)) {
-        $error = 'Tüm alanlar gereklidir.';
-    } elseif (empty($payment_method)) {
-        $error = 'Ödeme yöntemi seçiniz.';
+    $full_name = $_POST['full_name'] ?? '';
+    $email = $_POST['email'] ?? '';
+    $phone = $_POST['phone'] ?? '';
+    $address = $_POST['address'] ?? '';
+    $city = $_POST['city'] ?? '';
+    $postal_code = $_POST['postal_code'] ?? '';
+    $payment_method = $_POST['payment_method'] ?? '';
+    
+    // Basit validasyon
+    if (empty($full_name) || empty($email) || empty($phone) || empty($address) || empty($city) || empty($postal_code) || empty($payment_method)) {
+        $error = 'Lütfen tüm zorunlu alanları doldurun!';
     } else {
-        // Sipariş oluştur
-        // created_at ve updated_at otomatik olarak timestamp alacaktır.
-        $stmt = $conn->prepare("INSERT INTO orders (user_id, total_amount, STATUS) VALUES (?, ?, 'pending')");
-        $stmt->bind_param("id", $user_id, $total);
-        
-        if ($stmt->execute()) {
-            $order_id = $stmt->insert_id;
-            $stmt->close();
-
-            // Sipariş öğelerini ekle
-            $insert_ok = true;
+        try {
+            // Transaction başlat
+            $conn->begin_transaction();
             
-            // order_items tablosuna çoklu ekleme (Transaction kullanımı önerilir ama bu yapı da çalışır)
-            $item_stmt = $conn->prepare("INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)");
-            
+            // Stok kontrolü yap
+            $stock_errors = [];
             foreach ($cart_items as $item) {
-                $item_stmt->bind_param("iiii", $order_id, $item['product_id'], $item['quantity'], $item['price']);
-                if (!$item_stmt->execute()) {
-                    $insert_ok = false;
-                    // Hata durumunda break ile döngüden çık
-                    break; 
+                if ($item['quantity'] > $item['stock']) {
+                    $stock_errors[] = "{$item['name']} için yeterli stok yok! Mevcut stok: {$item['stock']}";
                 }
             }
-            $item_stmt->close();
-
-            if ($insert_ok) {
-                // Sepeti temizle
-                $clear_stmt = $conn->prepare("DELETE FROM cart WHERE user_id = ?");
-                $clear_stmt->bind_param("i", $user_id);
-                $clear_stmt->execute();
-                $clear_stmt->close();
-
-                // Sipariş onay sayfasına yönlendir
-                // Not: order-confirmation.php sayfasını ayrıca oluşturmalısınız.
-                header("Location: /order-confirmation.php?order_id=" . $order_id);
-                exit();
+            
+            // Stok hatası varsa işlemi iptal et
+            if (!empty($stock_errors)) {
+                $conn->rollback();
+                $error = implode('<br>', $stock_errors);
             } else {
-                $error = 'Sipariş detayları kaydedilirken bir hata oluştu.';
-                // Hata durumunda oluşturulan siparişi silebilirsiniz (opsiyonel)
+                // Siparişi oluştur
+                $stmt = $conn->prepare("
+                    INSERT INTO orders (user_id, total_amount, status) 
+                    VALUES (?, ?, 'pending')
+                ");
+                $stmt->bind_param("id", $user_id, $total);
+                $stmt->execute();
+                $order_id = $stmt->insert_id;
+                $stmt->close();
+                
+                // Sipariş detaylarını ekle ve stokları güncelle
+                foreach ($cart_items as $item) {
+                    // Sipariş kalemi ekle
+                    $stmt = $conn->prepare("
+                        INSERT INTO order_items (order_id, product_id, quantity, price) 
+                        VALUES (?, ?, ?, ?)
+                    ");
+                    $stmt->bind_param("iiid", $order_id, $item['product_id'], $item['quantity'], $item['price']);
+                    $stmt->execute();
+                    $stmt->close();
+                    
+                    // Stoku düş
+                    $stmt = $conn->prepare("
+                        UPDATE products 
+                        SET stock = stock - ? 
+                        WHERE id = ? AND stock >= ?
+                    ");
+                    $stmt->bind_param("iii", $item['quantity'], $item['product_id'], $item['quantity']);
+                    $stmt->execute();
+                    
+                    if ($stmt->affected_rows === 0) {
+                        throw new Exception("Stok güncellenirken hata oluştu: {$item['name']}");
+                    }
+                    $stmt->close();
+                }
+                
+                // Sepeti temizle
+                $stmt = $conn->prepare("DELETE FROM cart WHERE user_id = ?");
+                $stmt->bind_param("i", $user_id);
+                $stmt->execute();
+                $stmt->close();
+                
+                // Transaction'ı tamamla
+                $conn->commit();
+                
+                $_SESSION['success'] = 'Siparişiniz başarıyla oluşturuldu! Sipariş numaranız: #' . $order_id;
+                header('Location: orders.php');
+                exit();
+                
             }
-        } else {
-            $error = 'Sipariş oluşturulurken bir hata oluştu.';
+        } catch (Exception $e) {
+            $conn->rollback();
+            $error = 'Sipariş oluşturulurken hata: ' . $e->getMessage();
         }
     }
 }
 
-// 2. MANTIK BİTTİKTEN SONRA HEADER DAHİL EDİLİR
 require_once 'includes/header.php'; 
 ?>
 
@@ -135,7 +157,7 @@ require_once 'includes/header.php';
         <div class="container">
             <?php if ($error): ?>
                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <i class="fas fa-exclamation-circle me-2"></i><?php echo htmlspecialchars($error); ?>
+                    <i class="fas fa-exclamation-circle me-2"></i><?php echo $error; ?>
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             <?php endif; ?>
@@ -155,11 +177,13 @@ require_once 'includes/header.php';
                                 <div class="row g-3">
                                     <div class="col-md-6">
                                         <label for="full_name" class="form-label fw-medium">Ad Soyad *</label>
-                                        <input type="text" class="form-control" id="full_name" name="full_name" required>
+                                        <input type="text" class="form-control" id="full_name" name="full_name" 
+                                               value="<?php echo htmlspecialchars($_SESSION['username'] ?? ''); ?>" required>
                                     </div>
                                     <div class="col-md-6">
                                         <label for="email" class="form-label fw-medium">E-posta *</label>
-                                        <input type="email" class="form-control" id="email" name="email" value="<?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?>" required>
+                                        <input type="email" class="form-control" id="email" name="email" 
+                                               value="<?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?>" required>
                                     </div>
                                     <div class="col-md-6">
                                         <label for="phone" class="form-label fw-medium">Telefon *</label>
@@ -224,7 +248,7 @@ require_once 'includes/header.php';
                         </div>
 
                         <button type="submit" class="btn btn-primary btn-lg w-100">
-                            <i class="fas fa-check-circle me-2"></i>Siparişi Tamamla
+                            <i class="fas fa-check-circle me-2"></i>Siparişi Tamamla - ₺<?php echo number_format($total, 2, ',', '.'); ?>
                         </button>
                     </form>
                 </div>
@@ -238,9 +262,17 @@ require_once 'includes/header.php';
                         <div class="card-body">
                             <div class="summary-items mb-3" style="max-height: 300px; overflow-y: auto;">
                                 <?php foreach ($cart_items as $item): ?>
-                                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                                        <span class="text-muted"><?php echo htmlspecialchars($item['name']); ?> x<?php echo $item['quantity']; ?></span>
-                                        <span class="fw-bold">₺<?php echo number_format($item['price'] * $item['quantity'], 2, ',', '.'); ?></span>
+                                    <div class="d-flex align-items-center mb-3 pb-3 border-bottom">
+                                        <img src="<?php echo htmlspecialchars($item['image']); ?>" 
+                                             alt="<?php echo htmlspecialchars($item['name']); ?>" 
+                                             class="rounded me-3" style="width: 50px; height: 50px; object-fit: cover;">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1"><?php echo htmlspecialchars($item['name']); ?></h6>
+                                            <div class="d-flex justify-content-between">
+                                                <small class="text-muted"><?php echo $item['quantity']; ?> adet × ₺<?php echo number_format($item['price'], 2); ?></small>
+                                                <strong>₺<?php echo number_format($item['price'] * $item['quantity'], 2); ?></strong>
+                                            </div>
+                                        </div>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
