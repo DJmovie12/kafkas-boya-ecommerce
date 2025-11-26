@@ -37,7 +37,7 @@ require_once 'includes/header.php';
 ?>
 
     <!-- Page Header -->
-    <section class="page-header bg-light py-5" style="margin-top: 76px;">
+    <section class="page-header bg-light py-5" style="margin-top: 70px;">
         <div class="container">
             <div class="row align-items-center">
                 <div class="col-lg-8">
@@ -58,7 +58,7 @@ require_once 'includes/header.php';
 
     <!-- Orders Section -->
     <section class="py-5">
-        <div class="container">
+        <div class="container" style="height: %100; margin-bottom: 48px;">
             <div class="row">
                 <!-- Sidebar Menu (Opsiyonel, Profil sayfalarında genelde olur) -->
                 <div class="col-lg-3 mb-4">
@@ -134,7 +134,7 @@ require_once 'includes/header.php';
                                                             'delivered' => 'Teslim Edildi',
                                                             'cancelled' => 'İptal Edildi'
                                                         ];
-                                                        $status = $order['STATUS'] ?? 'pending';
+                                                        $status = $order['status'] ?? 'pending';
                                                         ?>
                                                         <span class="badge rounded-pill <?php echo $statusColors[$status] ?? 'bg-secondary'; ?>">
                                                             <?php echo $statusTexts[$status] ?? ucfirst($status); ?>

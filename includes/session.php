@@ -66,24 +66,70 @@ function generateCSRFToken() {
 }
 
 /**
- * Kullanıcının toplam sepet öğesi sayısını döndürür.
- * @param int $user_id
- * @param mysqli $conn
+ * Sepet öğe sayısını getir (hem girişli hem misafir için)
+ * @param int|null $user_id
+ * @param mysqli|null $conn
  * @return int
  */
-function getCartItemCount($user_id, $conn) {
-    if (!isset($conn) || !$conn) {
-        return 0; // Bağlantı yoksa 0 döndür
-    }
+function getCartItemCount($user_id = null, $conn = null) {
     $count = 0;
-    // Prepared statement ile güvenli sorgu
-    if ($stmt = $conn->prepare("SELECT SUM(quantity) as total FROM cart WHERE user_id = ?")) {
+    
+    if (isUserLoggedIn() && $conn && $user_id) {
+        // Giriş yapmış kullanıcı - veritabanından say
+        $stmt = $conn->prepare("SELECT SUM(quantity) as total FROM cart WHERE user_id = ?");
         $stmt->bind_param("i", $user_id);
         $stmt->execute();
         $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        $count = $row['total'] ?? 0;
+        $data = $result->fetch_assoc();
+        $count = $data['total'] ?? 0;
         $stmt->close();
+    } else {
+        // Misafir kullanıcı - session'dan say
+        if (isset($_SESSION['guest_cart'])) {
+            foreach ($_SESSION['guest_cart'] as $item) {
+                $count += $item['quantity'];
+            }
+        }
     }
+    
     return $count;
+}
+
+/**
+ * Misafir sepetini kullanıcıya aktar
+ * @param int $user_id
+ * @param mysqli $conn
+ */
+function transferGuestCartToUser($user_id, $conn) {
+    if (!isset($_SESSION['guest_cart']) || empty($_SESSION['guest_cart'])) {
+        return;
+    }
+    
+    foreach ($_SESSION['guest_cart'] as $guest_item) {
+        // Ürünün zaten sepette olup olmadığını kontrol et
+        $stmt = $conn->prepare("SELECT id, quantity FROM cart WHERE user_id = ? AND product_id = ?");
+        $stmt->bind_param("ii", $user_id, $guest_item['product_id']);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $cart_item = $result->fetch_assoc();
+        $stmt->close();
+        
+        if ($cart_item) {
+            // Varsa miktarı güncelle
+            $new_quantity = $cart_item['quantity'] + $guest_item['quantity'];
+            $stmt = $conn->prepare("UPDATE cart SET quantity = ? WHERE id = ?");
+            $stmt->bind_param("ii", $new_quantity, $cart_item['id']);
+            $stmt->execute();
+            $stmt->close();
+        } else {
+            // Yoksa yeni ekle
+            $stmt = $conn->prepare("INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)");
+            $stmt->bind_param("iii", $user_id, $guest_item['product_id'], $guest_item['quantity']);
+            $stmt->execute();
+            $stmt->close();
+        }
+    }
+    
+    // Session sepetini temizle
+    unset($_SESSION['guest_cart']);
 }

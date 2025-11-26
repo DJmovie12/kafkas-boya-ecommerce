@@ -19,9 +19,6 @@ class KafkasBoyaApp {
         this.initializeSearch();
         this.initializeScrollEffects();
         
-        // Miktar artırma/azaltma event'larını başlat
-        this.initializeQuantityControls();
-        
         // Sayfa yüklendiğinde sepet sayacını DOM'dan güncel tut
         this.updateCartCountFromDOM();
     }
@@ -59,14 +56,50 @@ class KafkasBoyaApp {
     showNotification(message, type = 'success') {
         // Create notification element
         const notification = document.createElement('div');
-        notification.className = `alert alert-${type} position-fixed top-0 end-0 m-3 z-index-3 slide-up`;
-        notification.style.minWidth = '300px';
+        
+        // Type'a göre class ve stil belirle
+        let alertClass = '';
+        let icon = '';
+        let customStyle = '';
+        
+        switch(type) {
+            case 'success':
+                alertClass = 'alert-success';
+                icon = 'fa-check-circle';
+                break;
+            case 'error':
+                alertClass = 'alert-danger';
+                icon = 'fa-exclamation-triangle';
+                customStyle = 'background: linear-gradient(135deg, #dc3545, #c82333) !important; color: white !important; border: none !important;';
+                break;
+            case 'warning':
+                alertClass = 'alert-warning';
+                icon = 'fa-exclamation-circle';
+                break;
+            case 'info':
+                alertClass = 'alert-info';
+                icon = 'fa-info-circle';
+                break;
+            default:
+                alertClass = 'alert-info';
+                icon = 'fa-info-circle';
+        }
+        
+        notification.className = `alert ${alertClass} position-fixed top-0 end-0 m-3 z-index-3 slide-up`;
+        notification.style.minWidth = '350px';
         notification.style.zIndex = '9999';
+        notification.style.boxShadow = '0 5px 15px rgba(0,0,0,0.3)';
+        
+        // Custom style varsa uygula
+        if (customStyle) {
+            notification.style.cssText += customStyle;
+        }
+        
         notification.innerHTML = `
             <div class="d-flex align-items-center">
-                <i class="fas fa-${this.getNotificationIcon(type)} me-2"></i>
-                <span>${message}</span>
-                <button type="button" class="btn-close ms-auto" onclick="this.parentElement.parentElement.remove()"></button>
+                <i class="fas ${icon} me-2"></i>
+                <div class="flex-grow-1">${message}</div>
+                <button type="button" class="btn-close btn-close-white ms-2" onclick="this.parentElement.parentElement.remove()"></button>
             </div>
         `;
 
@@ -80,45 +113,12 @@ class KafkasBoyaApp {
         }, 5000);
     }
 
-    getNotificationIcon(type) {
-        const icons = {
-            success: 'check-circle',
-            error: 'exclamation-circle',
-            warning: 'exclamation-triangle',
-            info: 'info-circle'
-        };
-        return icons[type] || icons.info;
-    }
-
-    // Miktar Artırma/Azaltma Mantığı için event listener'ları başlatır
-    initializeQuantityControls() {
-        const self = this;
-
-        // Miktar azaltma butonu için listener'lar
-        document.querySelectorAll('.quantity-decrease').forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.preventDefault();
-                const productId = this.getAttribute('data-product');
-                self.updateQuantity(productId, -1);
-            });
-        });
-
-        // Miktar artırma butonu için listener'lar
-        document.querySelectorAll('.quantity-increase').forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.preventDefault();
-                const productId = this.getAttribute('data-product');
-                self.updateQuantity(productId, 1);
-            });
-        });
-    }
-
     // Miktar değerini input içinde güncelleyen yardımcı fonksiyon
     updateQuantity(productId, change) {
         const quantityInput = document.getElementById('quantity_' + productId);
         if (quantityInput) {
             let currentValue = parseInt(quantityInput.value) || 0;
-            const maxStock = parseInt(quantityInput.getAttribute('max')) || 1; 
+            const maxStock = parseInt(quantityInput.getAttribute('max')) || 999; 
             let newValue = currentValue + change;
             
             // Alt limit kontrolü
@@ -148,6 +148,7 @@ class KafkasBoyaApp {
         data.append('product_id', productId);
         data.append('quantity', finalQuantity);
 
+        // MUTLAK YOL KULLAN - en güvenlisi
         fetch('/api/add_to_cart.php', {
             method: 'POST',
             body: data,
@@ -169,11 +170,14 @@ class KafkasBoyaApp {
                 if (data.cart_count !== undefined) {
                     this.updateCartCount(data.cart_count);
                 }
-            } else {
-                this.showNotification(data.message, 'error');
-                if (data.message.includes('giriş yapın')) {
-                    window.location.href = '/login.php';
+                // Misafir kullanıcı için bilgi mesajı
+                if (!data.logged_in && data.notice) {
+                    this.showNotification(data.notice, 'info');
                 }
+            } else {
+                // Stok hatası ise 'error' (kırmızı), diğer hatalar 'warning' (sarı)
+                const alertType = data.error_type === 'stock_limit' ? 'error' : 'warning';
+                this.showNotification(data.message, alertType);
             }
         })
         .catch(error => {
@@ -213,15 +217,17 @@ class KafkasBoyaApp {
                 this.removeFromWishlist(productId);
             }
 
-            // Quantity change buttons
+            // Quantity change buttons - TEK EVENT DELEGATION
             if (e.target.classList.contains('quantity-increase')) {
                 e.preventDefault();
+                e.stopPropagation();
                 const productId = e.target.getAttribute('data-product');
                 this.updateQuantity(productId, 1);
             }
 
             if (e.target.classList.contains('quantity-decrease')) {
                 e.preventDefault();
+                e.stopPropagation();
                 const productId = e.target.getAttribute('data-product');
                 this.updateQuantity(productId, -1);
             }

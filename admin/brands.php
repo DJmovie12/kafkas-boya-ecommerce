@@ -192,7 +192,7 @@ $brands = $conn->query("SELECT * FROM brands ORDER BY id ASC");
                                                     </div>
                                                 <?php endif; ?>
                                             </td>
-                                            <td><span class="fw-bold text-dark"><?php echo htmlspecialchars($brand['NAME']); ?></span></td>
+                                            <td><span class="fw-bold text-dark"><?php echo htmlspecialchars($brand['name']); ?></span></td>
                                             <td class="text-muted small"><?php echo htmlspecialchars($brand['description']); ?></td>
                                             <td class="text-end pe-4">
                                                 <a href="?delete=<?php echo $brand['id']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Bu markayı silmek istediğinize emin misiniz?')" title="Sil">

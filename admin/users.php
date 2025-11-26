@@ -116,16 +116,17 @@ $users = $conn->query("SELECT * FROM users ORDER BY created_at DESC");
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="ps-4" style="width: 60px;">ID</th>
-                                <th>Kullanıcı</th>
-                                <th>E-posta</th>
-                                <th>Rol</th>
-                                <th>Kayıt Tarihi</th>
-                                <th class="text-end pe-4">İşlem</th>
-                            </tr>
-                        </thead>
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4" style="width: 60px;">ID</th>
+                            <th>Kullanıcı</th>
+                            <th>E-posta</th>
+                            <th>Adres</th> <!-- YENİ EKLENEN -->
+                            <th>Rol</th>
+                            <th>Kayıt Tarihi</th>
+                            <th class="text-end pe-4">İşlem</th>
+                        </tr>
+                    </thead>
                         <tbody>
                             <?php if ($users->num_rows > 0): ?>
                                 <?php while($user = $users->fetch_assoc()): ?>
@@ -140,6 +141,14 @@ $users = $conn->query("SELECT * FROM users ORDER BY created_at DESC");
                                         </div>
                                     </td>
                                     <td><span class="text-muted"><?php echo htmlspecialchars($user['email']); ?></span></td>
+                                    <td>
+                                        <span class="text-muted small" title="<?php echo htmlspecialchars($user['address'] ?? 'Adres yok'); ?>">
+                                            <?php 
+                                            $address = $user['address'] ?? 'Adres yok';
+                                            echo strlen($address) > 30 ? substr($address, 0, 30) . '...' : $address;
+                                            ?>
+                                        </span>
+                                    </td>
                                     <td>
                                         <?php if($user['role'] === 'admin'): ?>
                                             <span class="badge bg-danger bg-opacity-10 text-danger px-3 py-2 rounded-pill"><i class="fas fa-shield-alt me-1"></i> Yönetici</span>

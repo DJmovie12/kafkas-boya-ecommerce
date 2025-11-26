@@ -275,7 +275,7 @@ require_once 'includes/header.php';
                     <div class="feature-card-modern p-4 rounded-4 text-center h-100 bg-white shadow-sm">
                         <div class="feature-icon-wrapper mb-4">
                             <div class="icon-circle bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center">
-                                <i class="fas fa-award fa-2x text-primary"></i>
+                                <i class="fas fa-award fa-2x text-light"></i>
                             </div>
                         </div>
                         <h5 class="fw-bold mb-2 text-dark">20+ Yıl Deneyim</h5>
@@ -380,7 +380,7 @@ require_once 'includes/header.php';
                     <p class="lead mb-0 text-light">Uzman ekibimiz size en uygun ürünü seçmekte yardımcı olacak</p>
                 </div>
                 <div class="col-lg-4 text-lg-end" data-aos="fade-left">
-                    <a href="#contact" class="btn btn-warning btn-lg px-5 rounded-pill fw-bold">
+                    <a href="contact.php" class="btn btn-warning btn-lg px-5 rounded-pill fw-bold">
                         <i class="fas fa-phone me-2"></i>Hemen İletişime Geç
                     </a>
                 </div>

@@ -154,7 +154,7 @@ require_once 'includes/header.php';
                         <div class="card-body text-center p-4">
                             <div class="mb-3">
                                 <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle" style="width: 80px; height: 80px;">
-                                    <i class="fas fa-user fa-2x"></i>
+                                    <i class="fas fa-user fa-2x text-light"></i>
                                 </div>
                             </div>
                             <h5 class="fw-bold mb-1"><?php echo htmlspecialchars($user_data['username']); ?></h5>

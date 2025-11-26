@@ -1,5 +1,5 @@
 <?php
-// checkout.php - session_start() satırını kaldırın veya değiştirin
+// checkout.php
 require_once 'includes/db_connect.php';
 require_once 'includes/session.php';
 
@@ -9,6 +9,16 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $user_id = $_SESSION['user_id'];
+
+// Kullanıcının adres bilgisini veritabanından al
+$user_stmt = $conn->prepare("SELECT address FROM users WHERE id = ?");
+$user_stmt->bind_param("i", $user_id);
+$user_stmt->execute();
+$user_result = $user_stmt->get_result();
+$user_data = $user_result->fetch_assoc();
+$user_stmt->close();
+
+$user_address = $user_data['address'] ?? '';
 
 // Sepetteki ürünleri al
 $stmt = $conn->prepare("
@@ -44,13 +54,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $full_name = $_POST['full_name'] ?? '';
     $email = $_POST['email'] ?? '';
     $phone = $_POST['phone'] ?? '';
-    $address = $_POST['address'] ?? '';
     $city = $_POST['city'] ?? '';
+    $district = $_POST['district'] ?? '';
+    $address = $_POST['address'] ?? '';
     $postal_code = $_POST['postal_code'] ?? '';
     $payment_method = $_POST['payment_method'] ?? '';
     
     // Basit validasyon
-    if (empty($full_name) || empty($email) || empty($phone) || empty($address) || empty($city) || empty($postal_code) || empty($payment_method)) {
+    if (empty($full_name) || empty($email) || empty($phone) || empty($city) || empty($district) || empty($address) || empty($postal_code) || empty($payment_method)) {
         $error = 'Lütfen tüm zorunlu alanları doldurun!';
     } else {
         try {
@@ -115,8 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Transaction'ı tamamla
                 $conn->commit();
                 
-                $_SESSION['success'] = 'Siparişiniz başarıyla oluşturuldu! Sipariş numaranız: #' . $order_id;
-                header('Location: orders.php');
+                header('Location: /order-confirmation.php?order_id=' . $order_id);
                 exit();
                 
             }
@@ -131,7 +141,7 @@ require_once 'includes/header.php';
 ?>
 
     <!-- Page Header -->
-    <section class="page-header bg-light py-5" style="margin-top: 76px;">
+    <section class="page-header bg-light py-5" style="margin-top: 70px;">
         <div class="container">
             <div class="row align-items-center">
                 <div class="col-lg-8">
@@ -177,13 +187,11 @@ require_once 'includes/header.php';
                                 <div class="row g-3">
                                     <div class="col-md-6">
                                         <label for="full_name" class="form-label fw-medium">Ad Soyad *</label>
-                                        <input type="text" class="form-control" id="full_name" name="full_name" 
-                                               value="<?php echo htmlspecialchars($_SESSION['username'] ?? ''); ?>" required>
+                                        <input type="text" class="form-control" id="full_name" name="full_name" required>
                                     </div>
                                     <div class="col-md-6">
                                         <label for="email" class="form-label fw-medium">E-posta *</label>
-                                        <input type="email" class="form-control" id="email" name="email" 
-                                               value="<?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?>" required>
+                                        <input type="email" class="form-control" id="email" name="email" required>
                                     </div>
                                     <div class="col-md-6">
                                         <label for="phone" class="form-label fw-medium">Telefon *</label>
@@ -202,13 +210,23 @@ require_once 'includes/header.php';
                             </div>
                             <div class="card-body">
                                 <div class="row g-3">
-                                    <div class="col-12">
-                                        <label for="address" class="form-label fw-medium">Adres *</label>
-                                        <textarea class="form-control" id="address" name="address" rows="3" required></textarea>
+                                    <div class="col-md-6">
+                                        <label for="city" class="form-label fw-medium">İl *</label>
+                                        <select class="form-select" id="city" name="city" required>
+                                            <option value="">İl Seçin</option>
+                                            <!-- İller API'den gelecek -->
+                                        </select>
                                     </div>
                                     <div class="col-md-6">
-                                        <label for="city" class="form-label fw-medium">Şehir *</label>
-                                        <input type="text" class="form-control" id="city" name="city" required>
+                                        <label for="district" class="form-label fw-medium">İlçe *</label>
+                                        <select class="form-select" id="district" name="district" required disabled>
+                                            <option value="">Önce il seçin</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="address" class="form-label fw-medium">Açık Adres *</label>
+                                        <textarea class="form-control" id="address" name="address" rows="3" placeholder="Mahalle, sokak, apartman, daire no vb. detaylı adres bilgisi" required><?php echo htmlspecialchars($user_address); ?></textarea>
+                                        <small class="text-muted">Teslimatın yapılacağı tam adresi yazın</small>
                                     </div>
                                     <div class="col-md-6">
                                         <label for="postal_code" class="form-label fw-medium">Posta Kodu *</label>
@@ -304,5 +322,129 @@ require_once 'includes/header.php';
             </div>
         </div>
     </section>
+
+    <!-- JavaScript for City-District API -->
+    <script>
+        // İlleri API'den çek
+        async function loadCities() {
+            try {
+                const response = await fetch('https://turkiyeapi.dev/api/v1/provinces');
+                const data = await response.json();
+                
+                const citySelect = document.getElementById('city');
+                
+                // İlleri alfabetik sırala ve select'e ekle
+                data.data.sort((a, b) => a.name.localeCompare(b.name)).forEach(city => {
+                    const option = document.createElement('option');
+                    option.value = city.name;
+                    option.textContent = city.name;
+                    citySelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('İller yüklenirken hata:', error);
+                // Fallback: Manuel il listesi
+                loadFallbackCities();
+            }
+        }
+
+        // İlçeleri API'den çek
+        async function loadDistricts(cityName) {
+            try {
+                const response = await fetch(`https://turkiyeapi.dev/api/v1/provinces?name=${encodeURIComponent(cityName)}`);
+                const data = await response.json();
+                
+                const districtSelect = document.getElementById('district');
+                
+                // Önceki ilçeleri temizle
+                districtSelect.innerHTML = '<option value="">İlçe Seçin</option>';
+                districtSelect.disabled = false;
+                
+                if (data.data && data.data.length > 0) {
+                    const city = data.data[0];
+                    // İlçeleri alfabetik sırala ve select'e ekle
+                    city.districts.sort((a, b) => a.name.localeCompare(b.name)).forEach(district => {
+                        const option = document.createElement('option');
+                        option.value = district.name;
+                        option.textContent = district.name;
+                        districtSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('İlçeler yüklenirken hata:', error);
+                // Fallback: Manuel ilçe listesi
+                loadFallbackDistricts(cityName);
+            }
+        }
+
+        // Fallback: Manuel il listesi (API çalışmazsa)
+        function loadFallbackCities() {
+            const cities = [
+                'Adana', 'Adıyaman', 'Afyonkarahisar', 'Ağrı', 'Amasya', 'Ankara', 'Antalya', 'Artvin',
+                'Aydın', 'Balıkesir', 'Bilecik', 'Bingöl', 'Bitlis', 'Bolu', 'Burdur', 'Bursa', 'Çanakkale',
+                'Çankırı', 'Çorum', 'Denizli', 'Diyarbakır', 'Edirne', 'Elazığ', 'Erzincan', 'Erzurum',
+                'Eskişehir', 'Gaziantep', 'Giresun', 'Gümüşhane', 'Hakkari', 'Hatay', 'Isparta', 'Mersin',
+                'İstanbul', 'İzmir', 'Kars', 'Kastamonu', 'Kayseri', 'Kırklareli', 'Kırşehir', 'Kocaeli',
+                'Konya', 'Kütahya', 'Malatya', 'Manisa', 'Kahramanmaraş', 'Mardin', 'Muğla', 'Muş', 'Nevşehir',
+                'Niğde', 'Ordu', 'Rize', 'Sakarya', 'Samsun', 'Siirt', 'Sinop', 'Sivas', 'Tekirdağ', 'Tokat',
+                'Trabzon', 'Tunceli', 'Şanlıurfa', 'Uşak', 'Van', 'Yozgat', 'Zonguldak', 'Aksaray', 'Bayburt',
+                'Karaman', 'Kırıkkale', 'Batman', 'Şırnak', 'Bartın', 'Ardahan', 'Iğdır', 'Yalova', 'Karabük',
+                'Kilis', 'Osmaniye', 'Düzce'
+            ];
+            
+            const citySelect = document.getElementById('city');
+            cities.sort().forEach(city => {
+                const option = document.createElement('option');
+                option.value = city;
+                option.textContent = city;
+                citySelect.appendChild(option);
+            });
+        }
+
+        // Fallback: Manuel ilçe listesi (API çalışmazsa)
+        function loadFallbackDistricts(cityName) {
+            // Basit bir fallback - sadece büyük şehirler için
+            const fallbackDistricts = {
+                'İstanbul': ['Adalar', 'Arnavutköy', 'Ataşehir', 'Avcılar', 'Bağcılar', 'Bahçelievler', 'Bakırköy', 'Başakşehir'],
+                'Ankara': ['Altındağ', 'Çankaya', 'Keçiören', 'Mamak', 'Sincan', 'Yenimahalle'],
+                'İzmir': ['Bornova', 'Buca', 'Karşıyaka', 'Konak', 'Bayraklı', 'Çiğli'],
+                'Bursa': ['Osmangazi', 'Yıldırım', 'Nilüfer', 'Gemlik', 'Gürsu'],
+                'Antalya': ['Kepez', 'Muratpaşa', 'Konyaaltı', 'Aksu']
+            };
+            
+            const districtSelect = document.getElementById('district');
+            districtSelect.innerHTML = '<option value="">İlçe Seçin</option>';
+            districtSelect.disabled = false;
+            
+            if (fallbackDistricts[cityName]) {
+                fallbackDistricts[cityName].forEach(district => {
+                    const option = document.createElement('option');
+                    option.value = district;
+                    option.textContent = district;
+                    districtSelect.appendChild(option);
+                });
+            } else {
+                const option = document.createElement('option');
+                option.value = 'Merkez';
+                option.textContent = 'Merkez';
+                districtSelect.appendChild(option);
+            }
+        }
+
+        // Sayfa yüklendiğinde illeri çek
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCities();
+            
+            // İl seçildiğinde ilçeleri çek
+            document.getElementById('city').addEventListener('change', function() {
+                const city = this.value;
+                if (city) {
+                    loadDistricts(city);
+                } else {
+                    document.getElementById('district').innerHTML = '<option value="">Önce il seçin</option>';
+                    document.getElementById('district').disabled = true;
+                }
+            });
+        });
+    </script>
 
 <?php require_once 'includes/footer.php'; ?>

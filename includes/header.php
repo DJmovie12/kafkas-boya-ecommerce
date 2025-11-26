@@ -7,10 +7,10 @@ require_once __DIR__ . '/session.php';
 $cart_count = 0;
 if (isUserLoggedIn() && isset($conn) && $conn) {
     $user_id = $_SESSION['user_id'];
-    
-    // GÜVENLİ SORGULAMA: getCartItemCount fonksiyonu session.php'ye taşındığı için onu çağırıyoruz
-    // NOT: Eğer getCartItemCount, session.php'de değilse, yukarıdaki session.php kodunu kullandığınızdan emin olun.
     $cart_count = getCartItemCount($user_id, $conn);
+} else {
+    // Misafir kullanıcı için session'dan sepet sayısını al
+    $cart_count = getCartItemCount();
 }
 ?>
 <!DOCTYPE html>
@@ -102,9 +102,14 @@ if (isUserLoggedIn() && isset($conn) && $conn) {
                             </ul>
                         </div>
                     <?php else: ?>
-                        <a href="/login.php" class="btn btn-primary btn-sm">
-                            <i class="fas fa-user me-1"></i>Giriş
-                        </a>
+                        <div class="d-flex gap-2">
+                            <a href="/login.php" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-sign-in-alt me-1"></i>Giriş Yap
+                            </a>
+                            <a href="/register.php" class="btn btn-primary btn-sm">
+                                <i class="fas fa-user-plus me-1"></i>Üye Ol
+                            </a>
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>

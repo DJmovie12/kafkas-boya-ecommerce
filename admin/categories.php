@@ -194,7 +194,7 @@ $categories = $conn->query("SELECT * FROM categories ORDER BY id ASC");
                                         <tr>
                                             <td class="ps-4 fw-bold text-muted">#<?php echo $cat['id']; ?></td>
                                             <td>
-                                                <span class="fw-bold text-dark"><?php echo htmlspecialchars($cat['NAME']); ?></span>
+                                                <span class="fw-bold text-dark"><?php echo htmlspecialchars($cat['name']); ?></span>
                                             </td>
                                             <td class="text-muted small"><?php echo htmlspecialchars($cat['description']); ?></td>
                                             <td class="text-end pe-4">

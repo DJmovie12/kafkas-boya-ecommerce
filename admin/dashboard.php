@@ -238,7 +238,7 @@ $top_products = $conn->query("SELECT p.id, p.name, SUM(oi.quantity) as total_sol
                                                 <td><span class="fw-bold text-primary">₺<?php echo number_format($order['total_amount'], 2, ',', '.'); ?></span></td>
                                                 <td>
                                                     <?php 
-                                                    $statusClass = match($order['STATUS']) {
+                                                    $statusClass = match($order['status']) {
                                                         'pending' => 'bg-warning text-dark',
                                                         'processing' => 'bg-info text-white',
                                                         'shipped' => 'bg-primary',
@@ -256,7 +256,7 @@ $top_products = $conn->query("SELECT p.id, p.name, SUM(oi.quantity) as total_sol
                                                     ];
                                                     ?>
                                                     <span class="badge rounded-pill <?php echo $statusClass; ?>">
-                                                        <?php echo $statusLabels[$order['STATUS']] ?? $order['STATUS']; ?>
+                                                        <?php echo $statusLabels[$order['status']] ?? $order['status']; ?>
                                                     </span>
                                                 </td>
                                                 <td>
