@@ -33,7 +33,7 @@ $stmt->execute();
 $result = $stmt->get_result();
 
 if ($result->num_rows === 0) {
-    header("Location: /orders.php");
+    header("Location: /profile.php?tab=orders");
     exit();
 }
 
@@ -185,7 +185,7 @@ ob_end_flush(); // Buffer'ı temizle
                     <!-- Action Buttons -->
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <a href="/orders.php" class="btn btn-primary w-100">
+                            <a href="/profile.php?tab=orders" class="btn btn-primary w-100">
                                 <i class="fas fa-list me-2"></i>Siparişlerim
                             </a>
                         </div>

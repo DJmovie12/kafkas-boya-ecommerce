@@ -640,7 +640,7 @@ include 'includes/header.php';
                     <?php foreach ($cart_items as $index => $item): 
                         $stock_level = $item['stock'] > 10 ? 'high' : ($item['stock'] > 5 ? 'medium' : 'low');
                         // product_id'yi doğru şekilde al
-                        $product_id = $is_guest ? $item['id'] : $item['product_id'];
+                        $product_id = $is_guest ? $item['id'] : ($item['product_id'] ?? $item['id']);
                     ?>
                         <div class="cart-item" style="animation-delay: <?php echo $index * 0.1; ?>s">
                             <div class="row align-items-center">
@@ -757,18 +757,22 @@ include 'includes/header.php';
             </div>
         <?php endif; ?>
         
-        <!-- Checkout butonunu güncelleyelim -->
-        <?php if ($is_guest): ?>
-            <a href="login.php?redirect=checkout.php" class="checkout-btn">
-                <i class="fas fa-sign-in-alt"></i>
-                Ödeme İçin Giriş Yap
-            </a>
-        <?php else: ?>
-            <a href="checkout.php" class="checkout-btn">
-                <i class="fas fa-lock"></i>
-                Güvenli Ödeme
-            </a>
-        <?php endif; ?>
+<!-- Checkout butonunu güncelleyelim -->
+<?php if ($is_guest): ?>
+    <?php 
+    // Misafir kullanıcı için redirect after login ayarla
+    setRedirectAfterLogin('checkout.php');
+    ?>
+    <a href="login.php" class="checkout-btn">
+        <i class="fas fa-sign-in-alt"></i>
+        Ödeme İçin Giriş Yap
+    </a>
+<?php else: ?>
+    <a href="checkout.php" class="checkout-btn">
+        <i class="fas fa-lock"></i>
+        Güvenli Ödeme
+    </a>
+<?php endif; ?>
         
         <a href="shop.php" class="continue-shopping">
             <i class="fas fa-arrow-left"></i>

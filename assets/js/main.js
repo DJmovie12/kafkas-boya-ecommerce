@@ -3,23 +3,20 @@
 
 class KafkasBoyaApp {
     constructor() {
-        // Sepet ve İstek Listesi verileri artık PHP/Veritabanı tarafından yönetildiği için, 
-        // bu JS objeleri sadece fallback veya client-side state için kullanılır.
         this.cart = JSON.parse(localStorage.getItem('kafkasCart')) || []; 
         this.wishlist = JSON.parse(localStorage.getItem('kafkasWishlist')) || [];
+        this.notificationStack = [];
+        this.loginNoticeShown = false; // Giriş bildirimi kontrolü
         this.init();
     }
 
     init() {
-        // Uygulama bileşenlerini sırayla başlat
         this.initializeEventListeners();
         this.initializeAnimations();
         this.initializeCart();
         this.initializeWishlist();
         this.initializeSearch();
         this.initializeScrollEffects();
-        
-        // Sayfa yüklendiğinde sepet sayacını DOM'dan güncel tut
         this.updateCartCountFromDOM();
     }
 
@@ -52,10 +49,46 @@ class KafkasBoyaApp {
         }
     }
 
+    // Bildirim Konteynerini Oluşturma
+    createNotificationContainer() {
+        let container = document.getElementById('notification-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'notification-container';
+            container.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 9999;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                max-width: 400px;
+            `;
+            document.body.appendChild(container);
+        }
+        return container;
+    }
+
     // Bilgilendirme Mesajı Gösterme Fonksiyonu
-    showNotification(message, type = 'success') {
-        // Create notification element
-        const notification = document.createElement('div');
+    showNotification(message, type = 'success', autoClose = true, persistentId = null) {
+        const container = this.createNotificationContainer();
+        
+        // Eğer persistentId varsa ve bu ID'ye sahip bildirim zaten varsa, yeniden oluşturma
+        if (persistentId) {
+            const existingNotification = document.getElementById(persistentId);
+            if (existingNotification) {
+                // Sadece mesajı güncelle
+                const messageElement = existingNotification.querySelector('.flex-grow-1');
+                if (messageElement) {
+                    messageElement.textContent = message;
+                }
+                return;
+            }
+        }
+        
+        // Benzersiz ID oluştur
+        const notificationId = persistentId || 'notification-' + Date.now();
         
         // Type'a göre class ve stil belirle
         let alertClass = '';
@@ -85,32 +118,63 @@ class KafkasBoyaApp {
                 icon = 'fa-info-circle';
         }
         
-        notification.className = `alert ${alertClass} position-fixed top-0 end-0 m-3 z-index-3 slide-up`;
-        notification.style.minWidth = '350px';
-        notification.style.zIndex = '9999';
-        notification.style.boxShadow = '0 5px 15px rgba(0,0,0,0.3)';
-        
-        // Custom style varsa uygula
-        if (customStyle) {
-            notification.style.cssText += customStyle;
-        }
+        // Bildirim elementi oluştur
+        const notification = document.createElement('div');
+        notification.id = notificationId;
+        notification.className = `alert ${alertClass} notification-item slide-in-right`;
+        notification.style.cssText = `
+            min-width: 350px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            margin: 0;
+            overflow: hidden;
+            ${customStyle}
+        `;
         
         notification.innerHTML = `
             <div class="d-flex align-items-center">
                 <i class="fas ${icon} me-2"></i>
                 <div class="flex-grow-1">${message}</div>
-                <button type="button" class="btn-close btn-close-white ms-2" onclick="this.parentElement.parentElement.remove()"></button>
+                <button type="button" class="btn-close ${type === 'error' ? 'btn-close-white' : ''} ms-2" onclick="kafkasApp.removeNotification('${notificationId}')"></button>
             </div>
         `;
 
-        document.body.appendChild(notification);
+        // Stack'e ekle ve göster
+        this.notificationStack.push(notificationId);
+        container.appendChild(notification);
 
-        // Auto remove after 5 seconds
-        setTimeout(() => {
-            if (notification.parentElement) {
-                notification.remove();
-            }
-        }, 5000);
+        // Sadece autoClose true ise ve persistent değilse otomatik kapat
+        if (autoClose && !persistentId) {
+            setTimeout(() => {
+                this.removeNotification(notificationId);
+            }, 5000);
+        }
+    }
+
+    // Bildirimi Kaldırma
+    removeNotification(notificationId) {
+        const notification = document.getElementById(notificationId);
+        if (notification) {
+            // Çıkış animasyonu
+            notification.classList.remove('slide-in-right');
+            notification.classList.add('slide-out-right');
+            
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+                
+                // Stack'ten kaldır
+                const index = this.notificationStack.indexOf(notificationId);
+                if (index > -1) {
+                    this.notificationStack.splice(index, 1);
+                }
+                
+                // Giriş bildirimi kaldırıldıysa flag'i sıfırla
+                if (notificationId === 'login-notice') {
+                    this.loginNoticeShown = false;
+                }
+            }, 300);
+        }
     }
 
     // Miktar değerini input içinde güncelleyen yardımcı fonksiyon
@@ -148,7 +212,6 @@ class KafkasBoyaApp {
         data.append('product_id', productId);
         data.append('quantity', finalQuantity);
 
-        // MUTLAK YOL KULLAN - en güvenlisi
         fetch('/api/add_to_cart.php', {
             method: 'POST',
             body: data,
@@ -170,9 +233,10 @@ class KafkasBoyaApp {
                 if (data.cart_count !== undefined) {
                     this.updateCartCount(data.cart_count);
                 }
-                // Misafir kullanıcı için bilgi mesajı
-                if (!data.logged_in && data.notice) {
-                    this.showNotification(data.notice, 'info');
+                // Misafir kullanıcı için bilgi mesajı - SADECE İLK DEFA GÖSTER
+                if (!data.logged_in && data.notice && !this.loginNoticeShown) {
+                    this.showNotification(data.notice, 'info', false, 'login-notice');
+                    this.loginNoticeShown = true;
                 }
             } else {
                 // Stok hatası ise 'error' (kırmızı), diğer hatalar 'warning' (sarı)
@@ -189,13 +253,24 @@ class KafkasBoyaApp {
     // Event Listeners
     initializeEventListeners() {
         document.addEventListener('click', (e) => {
-            // Add to cart buttons
-            if (e.target.classList.contains('add-to-cart')) {
+            // Sepete ekle butonları - GÜNCELLENDİ
+            if (e.target.classList.contains('add-to-cart') || e.target.closest('.add-to-cart')) {
                 e.preventDefault();
-                const productId = e.target.getAttribute('data-product');
-                this.addToCart(productId);
+                e.stopPropagation();
+                
+                const button = e.target.classList.contains('add-to-cart') ? e.target : e.target.closest('.add-to-cart');
+                const productId = button.getAttribute('data-product');
+                
+                // O ürüne ait bir miktar inputu var mı diye kontrol et (ID formatı: quantity_URUNID)
+                const quantityInput = document.getElementById('quantity_' + productId);
+                
+                // Input varsa değerini al, yoksa 1 gönder
+                const quantity = quantityInput ? quantityInput.value : 1;
+                
+                this.addToCart(productId, quantity);
             }
 
+            // Diğer event listener'lar aynı kalacak...
             // Add to wishlist buttons
             if (e.target.classList.contains('add-to-wishlist')) {
                 e.preventDefault();
@@ -217,7 +292,7 @@ class KafkasBoyaApp {
                 this.removeFromWishlist(productId);
             }
 
-            // Quantity change buttons - TEK EVENT DELEGATION
+            // Quantity change buttons
             if (e.target.classList.contains('quantity-increase')) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -244,6 +319,7 @@ class KafkasBoyaApp {
                 const targetId = e.target.getAttribute('href').substring(1);
                 this.smoothScrollTo(targetId);
             }
+        
 
             // Single product add to cart
             const singleProductCartButton = e.target.closest('#single-product-add-to-cart');
@@ -652,6 +728,45 @@ class KafkasBoyaApp {
         }
     }
 }
+
+// CSS Animasyonlarını ekle
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+    
+    .slide-in-right {
+        animation: slideInRight 0.3s ease-out forwards;
+    }
+    
+    .slide-out-right {
+        animation: slideOutRight 0.3s ease-in forwards;
+    }
+    
+    .notification-item {
+        transition: all 0.3s ease;
+    }
+`;
+document.head.appendChild(style);
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {

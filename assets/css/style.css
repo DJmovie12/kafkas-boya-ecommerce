@@ -433,6 +433,23 @@ h6 {
     }
 }
 
+@media (max-width: 991px) {
+    .col-lg-3 {
+        display: none !important;
+    }
+    .col-12.col-lg-9 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
+
+/* Masaüstü sıralamayı da mobilde gizle */
+@media (max-width: 991px) {
+    .d-none.d-lg-flex {
+        display: none !important;
+    }
+}
+
 /* Container genişlik ayarı */
 .container {
     max-width: 1200px;

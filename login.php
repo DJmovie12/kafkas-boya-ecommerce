@@ -1,6 +1,10 @@
 <?php
 require_once 'includes/db_connect.php';
 require_once 'includes/session.php';
+require_once 'includes/security.php';
+
+// Güvenlik header'larını ayarla
+set_security_headers();
 
 // Zaten giriş yapmışsa, ana sayfaya yönlendir
 if (isUserLoggedIn()) {
@@ -8,84 +12,228 @@ if (isUserLoggedIn()) {
     exit();
 }
 
-// transferGuestCartToUser fonksiyonunun var olduğundan emin ol
-if (!function_exists('transferGuestCartToUser')) {
-    require_once 'includes/session.php';
-}
-
 // Rate limiting initialization
-if (!isset($_SESSION['login_attempts'])) {
-    $_SESSION['login_attempts'] = 0;
-    $_SESSION['last_attempt_time'] = time();
+if (!isset($_SESSION['rate_limits'])) {
+    $_SESSION['rate_limits'] = [];
 }
 
 $error = '';
 $success = '';
+$field_errors = [];
+
+// Form verilerini saklamak için
+$form_data = [
+    'email' => ''
+];
+
+// "Beni Hatırla" cookie kontrolü
+if (isset($_COOKIE['remember_token']) && !isUserLoggedIn()) {
+    $remember_token = secure_input($_COOKIE['remember_token']);
+    $stmt = $conn->prepare("SELECT user_id FROM remember_tokens WHERE token = ? AND expires_at > NOW()");
+    $stmt->bind_param("s", $remember_token);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows === 1) {
+        $token_data = $result->fetch_assoc();
+        $user_id = $token_data['user_id'];
+        
+        // Kullanıcı bilgilerini al
+        $user_stmt = $conn->prepare("SELECT id, username, email, role, address FROM users WHERE id = ?");
+        $user_stmt->bind_param("i", $user_id);
+        $user_stmt->execute();
+        $user_result = $user_stmt->get_result();
+        
+        if ($user_result->num_rows === 1) {
+            $user = $user_result->fetch_assoc();
+            
+            // Oturum başlat
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['username'] = $user['username'];
+            $_SESSION['email'] = $user['email'];
+            $_SESSION['role'] = $user['role'];
+            $_SESSION['address'] = $user['address'];
+            $_SESSION['last_activity'] = time();
+            
+            // Session fixation koruması
+            session_regenerate_id(true);
+            
+            header("Location: /index.php");
+            exit();
+        }
+    }
+    
+    // Geçersiz token'ı temizle
+    setcookie('remember_token', '', time() - 3600, '/');
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Çok fazla deneme kontrolü - POST'tan önce kontrol et
-    if ($_SESSION['login_attempts'] >= 5 && (time() - $_SESSION['last_attempt_time']) < 900) {
-        $error = 'Çok fazla hatalı giriş denemesi. Lütfen 15 dakika sonra tekrar deneyin.';
+    // CSRF Token kontrolü
+    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+        $error = 'Güvenlik hatası. Lütfen formu tekrar doldurun.';
     } else {
-        $email = trim($_POST['email'] ?? '');
-        $password = trim($_POST['password'] ?? '');
-
-        // Validasyon
-        if (empty($email) || empty($password)) {
-            $error = 'E-posta ve şifre gereklidir.';
-            $_SESSION['login_attempts']++;
-            $_SESSION['last_attempt_time'] = time();
+        // Rate limiting kontrolü
+        $rate_limit_key = 'login_' . get_client_ip();
+        if (!check_rate_limit($rate_limit_key, 5, 900)) {
+            $error = 'Çok fazla hatalı giriş denemesi. Lütfen 15 dakika sonra tekrar deneyin.';
         } else {
-            // Veritabanında kullanıcıyı ara
-            $stmt = $conn->prepare("SELECT id, username, email, password, role, address FROM users WHERE email = ?");
-            $stmt->bind_param("s", $email);
-            $stmt->execute();
-            $result = $stmt->get_result();
-
-            if ($result->num_rows === 1) {
-                $user = $result->fetch_assoc();
-                
-                // Şifre kontrolü
-                if (password_verify($password, $user['password'])) {
-                    // Başarılı giriş - attemptleri sıfırla
-                    $_SESSION['login_attempts'] = 0;
-                    
-                    // Oturum başlat
-                    $_SESSION['user_id'] = $user['id'];
-                    $_SESSION['username'] = $user['username'];
-                    $_SESSION['email'] = $user['email'];
-                    $_SESSION['role'] = $user['role'];
-                    $_SESSION['address'] = $user['address'];
-
-                    // Misafir sepetini kullanıcıya aktar
-                    if (function_exists('transferGuestCartToUser')) {
-                        transferGuestCartToUser($user['id'], $conn);
-                    }
-
-                    // Başarılı giriş
-                    if ($user['role'] === 'admin') {
-                        header("Location: /admin/dashboard.php");
-                    } else {
-                        // Yönlendirme parametresini kontrol et
-                        $redirect = isset($_GET['redirect']) ? $_GET['redirect'] : 'index.php';
-                        header("Location: $redirect");
-                    }
-                    exit();
+            // Inputları temizle ve validate et
+            $email = secure_input($_POST['email'] ?? '', 'email');
+            $password = secure_input($_POST['password'] ?? '', 'password');
+            $remember_me = isset($_POST['remember_me']);
+            
+            // Validasyon
+            if (!$email) {
+                $field_errors['email'] = 'Geçerli bir e-posta adresi girin.';
+            }
+            
+            if (empty($password)) {
+                $field_errors['password'] = 'Şifre gereklidir.';
+            }
+            
+            // Form verilerini sakla
+            $form_data['email'] = htmlspecialchars($_POST['email'] ?? '', ENT_QUOTES, 'UTF-8');
+            
+            if (empty($field_errors)) {
+                // Veritabanında kullanıcıyı ara - Prepared statement ile
+                $stmt = $conn->prepare("SELECT id, username, email, password, role, address, login_attempts, last_login_attempt FROM users WHERE email = ?");
+                if (!$stmt) {
+                    $error = 'Sistem hatası. Lütfen daha sonra tekrar deneyin.';
                 } else {
-                    $error = 'E-posta veya şifre hatalı.';
-                    $_SESSION['login_attempts']++;
-                    $_SESSION['last_attempt_time'] = time();
+                    $stmt->bind_param("s", $email);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+
+                    if ($result->num_rows === 1) {
+                        $user = $result->fetch_assoc();
+                        
+                        // Hesap kilitleme kontrolü
+                        $max_attempts = 5;
+                        $lock_time = 900; // 15 dakika
+                        
+                        if ($user['login_attempts'] >= $max_attempts && 
+                            (time() - strtotime($user['last_login_attempt'])) < $lock_time) {
+                            $error = 'Hesabınız geçici olarak kilitlendi. Lütfen 15 dakika sonra tekrar deneyin.';
+                        } else {
+                            // Şifre kontrolü
+                            if (password_verify($password, $user['password'])) {
+                                // Başarılı giriş - attemptleri sıfırla
+                                $reset_stmt = $conn->prepare("UPDATE users SET login_attempts = 0, last_login_attempt = NULL WHERE id = ?");
+                                $reset_stmt->bind_param("i", $user['id']);
+                                $reset_stmt->execute();
+                                $reset_stmt->close();
+                                
+                                $_SESSION['rate_limits'][$rate_limit_key]['attempts'] = 0;
+                                
+                                // Oturum başlat
+                                $_SESSION['user_id'] = $user['id'];
+                                $_SESSION['username'] = $user['username'];
+                                $_SESSION['email'] = $user['email'];
+                                $_SESSION['role'] = $user['role'];
+                                $_SESSION['address'] = $user['address'];
+                                $_SESSION['last_activity'] = time();
+
+                                // Session fixation koruması
+                                session_regenerate_id(true);
+
+                                // "Beni Hatırla" işlemi
+                                if ($remember_me) {
+                                    $token = bin2hex(random_bytes(32));
+                                    $expires = time() + (30 * 24 * 60 * 60); // 30 gün
+                                    
+                                    // Önceki token'ları temizle
+                                    $delete_stmt = $conn->prepare("DELETE FROM remember_tokens WHERE user_id = ?");
+                                    $delete_stmt->bind_param("i", $user['id']);
+                                    $delete_stmt->execute();
+                                    $delete_stmt->close();
+                                    
+                                    // Yeni token ekle
+                                    $insert_stmt = $conn->prepare("INSERT INTO remember_tokens (user_id, token, expires_at) VALUES (?, ?, FROM_UNIXTIME(?))");
+                                    $insert_stmt->bind_param("isi", $user['id'], $token, $expires);
+                                    $insert_stmt->execute();
+                                    $insert_stmt->close();
+                                    
+                                    setcookie('remember_token', $token, $expires, '/', '', true, true);
+                                }
+
+                                // Misafir sepetini kullanıcıya aktar
+                                if (function_exists('transferGuestCartToUser')) {
+                                    transferGuestCartToUser($user['id'], $conn);
+                                    
+                                    // Sepet transfer mesajlarını al ve session'a kaydet
+                                    $transfer_messages = getCartTransferMessages();
+                                    if (!empty($transfer_messages)) {
+                                        $_SESSION['cart_transfer_info'] = $transfer_messages;
+                                    }
+                                }
+
+                                // Geçici contact mesajı varsa, mesajı gönder ve contact sayfasına yönlendir
+                                if (getTempContactMessage()) {
+                                    header("Location: contact.php?action=send_temp_message");
+                                    exit();
+                                }
+
+                                // Redirect after login kontrolü
+                                $redirect_url = getRedirectAfterLogin();
+                                if ($redirect_url) {
+                                    clearRedirectAfterLogin();
+                                    header("Location: $redirect_url");
+                                    exit();
+                                }
+
+                                // ÖNEMLİ DEĞİŞİKLİK: Öncelikle checkout'a yönlendir
+                                // Eğer sepette ürün varsa ve login cart sayfasından geldiyse checkout'a git
+                                $cart_count = getCartItemCount($user['id'], $conn);
+                                if ($cart_count > 0 && isset($_GET['redirect']) && $_GET['redirect'] === 'checkout.php') {
+                                    header("Location: checkout.php");
+                                    exit();
+                                }
+
+                                // Normal yönlendirme
+                                if ($user['role'] === 'admin') {
+                                    header("Location: /admin/dashboard.php");
+                                } else {
+                                    // Burada direkt index.php'ye yönlendir, çünkü özel durumlar zaten yukarıda kontrol edildi
+                                    header("Location: index.php");
+                                    exit();
+                                }
+                                exit();
+                            } else {
+                                // Hatalı şifre - attempt sayısını artır
+                                $attempts = $user['login_attempts'] + 1;
+                                $update_stmt = $conn->prepare("UPDATE users SET login_attempts = ?, last_login_attempt = NOW() WHERE id = ?");
+                                $update_stmt->bind_param("ii", $attempts, $user['id']);
+                                $update_stmt->execute();
+                                $update_stmt->close();
+                                
+                                increment_rate_limit($rate_limit_key);
+                                
+                                $remaining_attempts = $max_attempts - $attempts;
+                                if ($remaining_attempts > 0) {
+                                    $error = "E-posta veya şifre hatalı. Kalan deneme hakkı: {$remaining_attempts}";
+                                } else {
+                                    $error = "Hesabınız geçici olarak kilitlendi. Lütfen 15 dakika sonra tekrar deneyin.";
+                                }
+                            }
+                        }
+                    } else {
+                        // Kullanıcı bulunamadı
+                        increment_rate_limit($rate_limit_key);
+                        $error = 'E-posta veya şifre hatalı.';
+                    }
+                    $stmt->close();
                 }
             } else {
-                $error = 'E-posta veya şifre hatalı.';
-                $_SESSION['login_attempts']++;
-                $_SESSION['last_attempt_time'] = time();
+                $error = 'Lütfen formdaki hataları düzeltin.';
             }
-            $stmt->close();
         }
     }
 }
+
+// CSRF Token oluştur
+$csrf_token = generate_csrf_token();
 ?>
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -99,490 +247,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --primary: #4A90E2;
-            --primary-dark: #2C6EBB;
-            --primary-light: #7FB3F0;
-            --secondary: #D4AF37;
-            --secondary-dark: #B8941F;
-            --accent: #8B4513;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #4A90E2 0%, #2C6EBB 50%, #7FB3F0 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            position: relative;
-            overflow-x: hidden;
-        }
-
-        /* Animated Background Particles */
-        .particles {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            z-index: 1;
-            pointer-events: none;
-        }
-
-        .particle {
-            position: absolute;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 50%;
-            animation: float 15s infinite;
-        }
-
-        .particle:nth-child(1) { width: 80px; height: 80px; left: 10%; animation-delay: 0s; }
-        .particle:nth-child(2) { width: 60px; height: 60px; left: 30%; animation-delay: 2s; }
-        .particle:nth-child(3) { width: 100px; height: 100px; left: 50%; animation-delay: 4s; }
-        .particle:nth-child(4) { width: 70px; height: 70px; left: 70%; animation-delay: 6s; }
-        .particle:nth-child(5) { width: 90px; height: 90px; left: 85%; animation-delay: 8s; }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.3; }
-            50% { transform: translateY(-100px) rotate(180deg); opacity: 0.6; }
-        }
-
-        /* Main Container */
-        .login-wrapper {
-            position: relative;
-            z-index: 10;
-            width: 100%;
-            max-width: 1000px;
-        }
-
-        .login-container {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(20px);
-            border-radius: 30px;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            overflow: hidden;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            min-height: 550px;
-            animation: slideUp 0.6s ease-out;
-        }
-
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Left Side - Info */
-        .info-side {
-            background: linear-gradient(135deg, rgba(74, 144, 226, 0.95), rgba(44, 110, 187, 0.95));
-            padding: 50px 40px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .info-side::before {
-            content: '';
-            position: absolute;
-            width: 300px;
-            height: 300px;
-            background: rgba(212, 175, 55, 0.2);
-            border-radius: 50%;
-            top: -100px;
-            left: -100px;
-        }
-
-        .info-side::after {
-            content: '';
-            position: absolute;
-            width: 200px;
-            height: 200px;
-            background: rgba(212, 175, 55, 0.15);
-            border-radius: 50%;
-            bottom: -50px;
-            right: -50px;
-        }
-
-        .info-content {
-            position: relative;
-            z-index: 2;
-            text-align: center;
-        }
-
-        .info-icon {
-            font-size: 80px;
-            margin-bottom: 30px;
-            opacity: 0.9;
-            color: var(--secondary);
-            animation: bounce 3s infinite;
-        }
-
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-20px); }
-        }
-
-        .info-content h2 {
-            font-size: 32px;
-            font-weight: 700;
-            font-family: 'Playfair Display', serif;
-            margin-bottom: 15px;
-        }
-
-        .info-content p {
-            font-size: 16px;
-            opacity: 0.9;
-            margin-bottom: 40px;
-        }
-
-        .features {
-            width: 100%;
-            max-width: 350px;
-        }
-
-        .feature {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 15px;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 15px;
-            margin-bottom: 15px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: all 0.3s;
-        }
-
-        .feature:hover {
-            background: rgba(212, 175, 55, 0.2);
-            transform: translateX(10px);
-            border-color: var(--secondary);
-        }
-
-        .feature-icon {
-            width: 45px;
-            height: 45px;
-            background: rgba(212, 175, 55, 0.3);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            color: var(--secondary);
-        }
-
-        .feature-text {
-            text-align: left;
-        }
-
-        .feature-text strong {
-            display: block;
-            font-size: 15px;
-            margin-bottom: 3px;
-        }
-
-        .feature-text small {
-            font-size: 13px;
-            opacity: 0.8;
-        }
-
-        /* Right Side - Form */
-        .form-side {
-            padding: 50px 40px;
-            background: white;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .brand {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .brand-logo {
-            width: 150px;
-            height: auto;
-            margin-bottom: 15px;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-
-        .brand h1 {
-            font-size: 28px;
-            font-weight: 700;
-            font-family: 'Playfair Display', serif;
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 5px;
-        }
-
-        .brand p {
-            color: #64748b;
-            font-size: 14px;
-        }
-
-        /* Alert Messages */
-        .alert {
-            padding: 15px 20px;
-            border-radius: 15px;
-            margin-bottom: 25px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 14px;
-            animation: slideIn 0.5s ease-out;
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-20px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-
-        .alert-danger {
-            background: #fee;
-            color: #E74C3C;
-            border: 1px solid #fcc;
-        }
-
-        .alert-success {
-            background: #d1fae5;
-            color: #10b981;
-            border: 1px solid #a7f3d0;
-        }
-
-        .alert i {
-            font-size: 18px;
-        }
-
-        /* Form Groups */
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #1e293b;
-            font-weight: 500;
-            font-size: 14px;
-        }
-
-        .input-wrapper {
-            position: relative;
-        }
-
-        .input-icon {
-            position: absolute;
-            left: 18px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #94a3b8;
-            font-size: 16px;
-            transition: all 0.3s;
-        }
-
-        .form-control {
-            width: 100%;
-            padding: 14px 18px 14px 50px;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            font-size: 15px;
-            transition: all 0.3s;
-            background: #f8fafc;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: var(--primary);
-            background: white;
-            box-shadow: 0 0 0 4px rgba(74, 144, 226, 0.1);
-        }
-
-        .form-control:focus + .input-icon {
-            color: var(--primary);
-        }
-
-        /* Password Toggle */
-        .password-toggle {
-            position: absolute;
-            right: 18px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: #94a3b8;
-            cursor: pointer;
-            font-size: 16px;
-            transition: all 0.3s;
-        }
-
-        .password-toggle:hover {
-            color: var(--primary);
-        }
-
-        /* Remember Me */
-        .form-options {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-        }
-
-        .checkbox-wrapper {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .checkbox-wrapper input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-            accent-color: var(--primary);
-        }
-
-        .checkbox-wrapper label {
-            font-size: 14px;
-            color: #64748b;
-            cursor: pointer;
-            margin: 0;
-        }
-
-        /* Submit Button */
-        .btn-submit {
-            width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .btn-submit::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-            transition: left 0.5s;
-        }
-
-        .btn-submit:hover::before {
-            left: 100%;
-        }
-
-        .btn-submit:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 30px rgba(74, 144, 226, 0.4);
-        }
-
-        .btn-submit:active {
-            transform: translateY(0);
-        }
-
-        /* Links */
-        .form-footer {
-            text-align: center;
-            margin-top: 25px;
-        }
-
-        .form-footer p {
-            color: #64748b;
-            font-size: 14px;
-        }
-
-        .form-footer a {
-            color: var(--primary);
-            text-decoration: none;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-
-        .form-footer a:hover {
-            color: var(--primary-dark);
-            text-decoration: underline;
-        }
-
-        .back-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            color: #64748b;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.3s;
-            margin-top: 15px;
-        }
-
-        .back-link:hover {
-            border-color: var(--primary);
-            color: var(--primary);
-            transform: translateX(-5px);
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .login-container {
-                grid-template-columns: 1fr;
-            }
-
-            .info-side {
-                display: none;
-            }
-
-            .form-side {
-                padding: 30px 20px;
-            }
-
-            .brand h1 {
-                font-size: 24px;
-            }
-
-            .brand-logo {
-                width: 120px;
-            }
-        }
-    </style>
+    <!-- CSS -->
+    <link rel="stylesheet" href="assets/css/login.css">
 </head>
 <body>
     <div class="particles">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
     </div>
 
-    <div class="login-wrapper">
-        <div class="login-container">
+    <div class="auth-wrapper">
+        <div class="auth-container login-container">
             <!-- Info Side -->
             <div class="info-side">
                 <div class="info-content">
@@ -643,6 +321,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <p>Hesabınıza giriş yapın</p>
                 </div>
                 
+                <?php if (getTempContactMessage()): ?>
+                    <div class="contact-message-info">
+                        <h6><i class="fas fa-envelope me-2"></i>Mesajınız Bekliyor</h6>
+                        <p>Giriş yaptıktan sonra iletişim mesajınız otomatik olarak gönderilecektir.</p>
+                    </div>
+                <?php endif; ?>
+
                 <?php if ($error && strpos($error, 'Çok fazla hatalı giriş denemesi') !== false): ?>
                     <div class="alert alert-warning">
                         <i class="fas fa-clock me-2"></i>
@@ -657,44 +342,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 <?php endif; ?>
 
-                <?php if ($success): ?>
-                    <div class="alert alert-success">
-                        <i class="fas fa-check-circle"></i>
-                        <span><?php echo htmlspecialchars($success); ?></span>
-                    </div>
-                <?php endif; ?>
-
-                <form method="POST">
+                <form method="POST" id="loginForm">
+                    <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
+                    
                     <div class="form-group">
                         <label for="email">E-posta Adresi</label>
-                        <div class="input-wrapper">
-                            <input type="email" id="email" name="email" class="form-control" 
-                                   placeholder="ornek@example.com" required>
+                        <div class="input-wrapper <?php echo isset($field_errors['email']) ? 'error' : ''; ?>">
+                            <input type="email" id="email" name="email" class="form-control <?php echo isset($field_errors['email']) ? 'input-error' : ''; ?>" 
+                                   placeholder="ornek@example.com" required 
+                                   value="<?php echo htmlspecialchars($form_data['email']); ?>">
                             <i class="fas fa-envelope input-icon"></i>
                         </div>
+                        <?php if (isset($field_errors['email'])): ?>
+                            <span class="error-message"><?php echo htmlspecialchars($field_errors['email']); ?></span>
+                        <?php endif; ?>
                     </div>
 
                     <div class="form-group">
                         <label for="password">Şifre</label>
-                        <div class="input-wrapper">
-                            <input type="password" id="password" name="password" class="form-control" 
+                        <div class="input-wrapper <?php echo isset($field_errors['password']) ? 'error' : ''; ?>">
+                            <input type="password" id="password" name="password" class="form-control <?php echo isset($field_errors['password']) ? 'input-error' : ''; ?>" 
                                    placeholder="••••••••" required>
                             <i class="fas fa-lock input-icon"></i>
                             <button type="button" class="password-toggle" id="togglePassword">
                                 <i class="fas fa-eye"></i>
                             </button>
                         </div>
+                        <?php if (isset($field_errors['password'])): ?>
+                            <span class="error-message"><?php echo htmlspecialchars($field_errors['password']); ?></span>
+                        <?php endif; ?>
                     </div>
 
                     <div class="form-options">
                         <div class="checkbox-wrapper">
-                            <input type="checkbox" id="remember_me" name="remember_me">
+                            <input type="checkbox" id="remember_me" name="remember_me" value="1">
                             <label for="remember_me">Beni Hatırla</label>
                         </div>
                     </div>
 
                     <button type="submit" class="btn-submit">
-                        <i class="fas fa-sign-in-alt"></i> Giriş Yap
+                        <i class="fas fa-sign-in-alt"></i> 
+                        <?php echo getTempContactMessage() ? 'Giriş Yap ve Mesajı Gönder' : 'Giriş Yap'; ?>
                     </button>
                 </form>
 
@@ -722,6 +410,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 icon.classList.replace('fa-eye-slash', 'fa-eye');
             }
         });
+
+        // Real-time validation
+        document.getElementById('loginForm').addEventListener('input', function(e) {
+            const target = e.target;
+            if (target.name === 'email') {
+                validateEmail(target);
+            }
+        });
+
+        function validateEmail(input) {
+            const email = input.value.trim();
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            
+            if (email && !emailRegex.test(email)) {
+                input.classList.add('input-error');
+            } else {
+                input.classList.remove('input-error');
+            }
+        }
     </script>
 </body>
 </html>

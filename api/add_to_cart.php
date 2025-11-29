@@ -37,16 +37,6 @@ try {
     $product = $stock_result->fetch_assoc();
     $stock_stmt->close();
     
-    // Stok yeterli mi kontrol et
-    if ($product['stock'] < $quantity) {
-        header('Content-Type: application/json');
-        echo json_encode([
-            'success' => false, 
-            'message' => "Yeterli stok yok! Mevcut stok: {$product['stock']} adet"
-        ]);
-        exit;
-    }
-
     // KULLANICI GİRİŞ YAPMIŞ MI KONTROL ET
     if (isUserLoggedIn()) {
         // ============================================
@@ -66,16 +56,17 @@ try {
             // Ürün sepette varsa: Toplam miktarı kontrol et
             $new_quantity = $cart_item['quantity'] + $quantity;
             
-                // Stok kontrolü (sepetteki + yeni eklenen)
-                if ($new_quantity > $product['stock']) {
-                    header('Content-Type: application/json');
-                    echo json_encode([
-                        'success' => false, 
-                        'message' => "❌ STOK YETERSİZ! Sepetinizde zaten {$cart_item['quantity']} adet var. Toplam {$product['stock']} adetten fazla ekleyemezsiniz!",
-                        'error_type' => 'stock_limit'
-                    ]);
-                    exit;
-                }
+            // Stok kontrolü (sepetteki + yeni eklenen)
+            if ($new_quantity > $product['stock']) {
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => false, 
+                    'message' => "❌ STOK YETERSİZ! Sepetinizde zaten {$cart_item['quantity']} adet var. Toplam {$product['stock']} adetten fazla ekleyemezsiniz!",
+                    'error_type' => 'stock_limit'
+                ]);
+                exit;
+            }
+            
             // Stok yeterli, güncelle
             $stmt = $conn->prepare("UPDATE cart SET quantity = ? WHERE id = ?");
             $stmt->bind_param("ii", $new_quantity, $cart_item['id']);
@@ -85,6 +76,17 @@ try {
             $message = "Ürün sepetinizdeki mevcut miktarına $quantity adet eklendi.";
         } else {
             // Ürün sepette yoksa: Yeni kayıt oluştur
+            // Stok kontrolü
+            if ($quantity > $product['stock']) {
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => false, 
+                    'message' => "❌ STOK YETERSİZ! İstediğiniz miktar: $quantity adet, Mevcut stok: {$product['stock']} adet",
+                    'error_type' => 'stock_limit'
+                ]);
+                exit;
+            }
+            
             $stmt = $conn->prepare("INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)");
             $stmt->bind_param("iii", $user_id, $product_id, $quantity);
             $stmt->execute();
@@ -112,32 +114,40 @@ try {
             $_SESSION['guest_cart'] = [];
         }
         
-        // Ürün zaten sepette var mı kontrol et
-        $product_found = false;
-        foreach ($_SESSION['guest_cart'] as &$item) {
+        // Mevcut sepetteki bu ürünün miktarını bul
+        $current_quantity = 0;
+        $item_index = -1;
+        
+        foreach ($_SESSION['guest_cart'] as $index => $item) {
             if ($item['product_id'] == $product_id) {
-                $new_quantity = $item['quantity'] + $quantity;
-                
-                // Stok kontrolü (sepetteki + yeni eklenen)
-                if ($new_quantity > $product['stock']) {
-                    header('Content-Type: application/json');
-                    echo json_encode([
-                        'success' => false, 
-                        'message' => "❌ STOK YETERSİZ! Sepetinizde zaten {$item['quantity']} adet var. Toplam {$product['stock']} adetten fazla ekleyemezsiniz!",
-                        'error_type' => 'stock_limit'
-                    ]);
-                    exit;
-                }
-                
-                $item['quantity'] = $new_quantity;
-                $product_found = true;
-                $message = "Ürün sepetinizdeki mevcut miktarına $quantity adet eklendi.";
+                $current_quantity = $item['quantity'];
+                $item_index = $index;
                 break;
             }
         }
         
-        // Ürün sepette yoksa yeni ekle
-        if (!$product_found) {
+        // Toplam miktarı hesapla
+        $new_quantity = $current_quantity + $quantity;
+        
+        // Stok kontrolü
+        if ($new_quantity > $product['stock']) {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false, 
+                'message' => "❌ STOK YETERSİZ! " . ($current_quantity > 0 ? "Sepetinizde zaten {$current_quantity} adet var. " : "") . "Toplam {$product['stock']} adetten fazla ekleyemezsiniz!",
+                'error_type' => 'stock_limit'
+            ]);
+            exit;
+        }
+        
+        // Ürünü güncelle veya yeni ekle
+        if ($item_index >= 0) {
+            // Ürün zaten sepette, miktarı güncelle
+            $_SESSION['guest_cart'][$item_index]['quantity'] = $new_quantity;
+            $_SESSION['guest_cart'][$item_index]['updated_at'] = time();
+            $message = "Ürün sepetinizdeki mevcut miktarına $quantity adet eklendi. Toplam: $new_quantity adet";
+        } else {
+            // Yeni ürün ekle
             $_SESSION['guest_cart'][] = [
                 'product_id' => $product_id,
                 'quantity' => $quantity,
@@ -151,6 +161,9 @@ try {
         foreach ($_SESSION['guest_cart'] as $item) {
             $cart_count += $item['quantity'];
         }
+        
+        // DEBUG: Session içeriğini logla (sadece geliştirme ortamında)
+        // error_log("Guest Cart: " . print_r($_SESSION['guest_cart'], true));
         
         // Başarılı yanıt gönder (Session'dan sepet sayısı)
         header('Content-Type: application/json');

@@ -1,34 +1,204 @@
 <?php
+ob_start();
 $page_title = "İletişim";
 require_once 'includes/header.php';
+require_once 'includes/db_connect.php';
+require_once 'includes/session.php';
 
 $error = '';
 $success = '';
 
+// CSRF Token oluştur
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+// Güvenlik fonksiyonları
+function sanitize_input($data) {
+    if (is_array($data)) {
+        return array_map('sanitize_input', $data);
+    }
+    $data = trim($data);
+    $data = stripslashes($data);
+    $data = htmlspecialchars($data, ENT_QUOTES, 'UTF-8');
+    return $data;
+}
+
+function validate_phone($phone) {
+    // Telefon numarası validasyonu (Türkiye formatı)
+    $phone = preg_replace('/[^0-9]/', '', $phone);
+    if (empty($phone)) return true; // Telefon opsiyonel
+    if (strlen($phone) < 10) return false;
+    return preg_match('/^(\+90|0)?[5][0-9]{9}$/', $phone);
+}
+
+function validate_name($name) {
+    // İsim validasyonu (sadece harf, boşluk ve Türkçe karakterler)
+    return preg_match('/^[a-zA-ZğüşıöçĞÜŞİÖÇ\s]{2,50}$/u', $name);
+}
+
+function validate_subject($subject) {
+    // Konu validasyonu
+    return strlen($subject) >= 3 && strlen($subject) <= 100;
+}
+
+function validate_message($message) {
+    // Mesaj validasyonu
+    return strlen($message) >= 10 && strlen($message) <= 1000;
+}
+
 // Form gönderimi
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name = trim($_POST['name'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $phone = trim($_POST['phone'] ?? '');
-    $subject = trim($_POST['subject'] ?? '');
-    $message = trim($_POST['message'] ?? '');
-
-    // Validasyon
-    if (empty($name) || empty($email) || empty($subject) || empty($message)) {
-        $error = 'Tüm alanlar gereklidir.';
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = 'Geçerli bir e-posta adresi girin.';
+    // CSRF kontrolü
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        $error = 'Geçersiz işlem! Lütfen formu tekrar doldurun.';
     } else {
-        // E-posta gönder (gerçek uygulamada mail() fonksiyonu kullanılabilir)
-        // Şimdilik başarı mesajı göster
-        $success = 'Mesajınız başarıyla gönderildi. En kısa zamanda sizinle iletişime geçeceğiz.';
+        $name = sanitize_input($_POST['name'] ?? '');
+        $email = sanitize_input($_POST['email'] ?? '');
+        $phone = sanitize_input($_POST['phone'] ?? '');
+        $subject = sanitize_input($_POST['subject'] ?? '');
+        $message = sanitize_input($_POST['message'] ?? '');
         
-        // Veritabanına kaydet (isteğe bağlı)
-        // $stmt = $conn->prepare("INSERT INTO contact_messages (name, email, phone, subject, message) VALUES (?, ?, ?, ?, ?)");
-        // $stmt->bind_param("sssss", $name, $email, $phone, $subject, $message);
-        // $stmt->execute();
-        // $stmt->close();
+        // Validasyon
+        $errors = [];
+        
+        if (empty($name) || !validate_name($name)) {
+            $errors[] = 'Geçerli bir ad soyad girin (2-50 karakter, sadece harf ve boşluk)';
+        }
+        
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Geçerli bir e-posta adresi girin';
+        }
+        
+        if (!empty($phone) && !validate_phone($phone)) {
+            $errors[] = 'Geçerli bir telefon numarası girin (örn: 05551234567)';
+        }
+        
+        if (empty($subject) || !validate_subject($subject)) {
+            $errors[] = 'Konu 3-100 karakter arasında olmalıdır';
+        }
+        
+        if (empty($message) || !validate_message($message)) {
+            $errors[] = 'Mesaj 10-1000 karakter arasında olmalıdır';
+        }
+        
+        if (!empty($errors)) {
+            $error = implode('<br>', $errors);
+        } else {
+            // Rate limiting kontrolü (1 dakikada maksimum 3 mesaj) - IP adresi olmadan email bazlı
+            $current_time = time();
+            $one_minute_ago = $current_time - 60;
+            
+            $stmt = $conn->prepare("SELECT COUNT(*) as message_count FROM contacts WHERE email = ? AND created_at > FROM_UNIXTIME(?)");
+            $stmt->bind_param("si", $email, $one_minute_ago);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $message_count = $result->fetch_assoc()['message_count'];
+            $stmt->close();
+            
+            if ($message_count >= 3) {
+                $error = 'Çok fazla mesaj gönderdiniz. Lütfen 1 dakika bekleyin.';
+            } else {
+                // Kullanıcı giriş yapmış mı kontrol et
+                if (isUserLoggedIn()) {
+                    // Giriş yapmışsa direkt kaydet
+                    $user_id = $_SESSION['user_id'];
+                    $stmt = $conn->prepare("INSERT INTO contacts (user_id, name, email, phone, subject, message) VALUES (?, ?, ?, ?, ?, ?)");
+                    
+                    if ($stmt) {
+                        $stmt->bind_param("isssss", $user_id, $name, $email, $phone, $subject, $message);
+                        
+                        if ($stmt->execute()) {
+                            $_SESSION['contact_success'] = 'Mesajınız başarıyla gönderildi. En kısa zamanda sizinle iletişime geçeceğiz.';
+                            ob_end_clean();
+                            header('Location: contact.php');
+                            exit();
+                        } else {
+                            $error = 'Mesaj gönderilirken bir hata oluştu. Lütfen tekrar deneyin.';
+                        }
+                        $stmt->close();
+                    } else {
+                        $error = 'Veritabanı hatası: ' . $conn->error;
+                    }
+                } else {
+                    // Giriş yapmamışsa mesajı session'a kaydet ve giriş/üye ol sayfasına yönlendir
+                    $tempMessage = [
+                        'name' => $name,
+                        'email' => $email,
+                        'phone' => $phone,
+                        'subject' => $subject,
+                        'message' => $message
+                    ];
+                    
+                    saveTempContactMessage($tempMessage);
+                    $_SESSION['redirect_after_login'] = 'contact.php';
+                    
+                    // Kullanıcıyı giriş sayfasına yönlendir
+                    ob_end_clean();
+                    header('Location: login.php?action=complete_contact');
+                    exit();
+                }
+            }
+        }
     }
+}
+
+// Giriş yaptıktan sonra mesaj gönderme işlemi - DÜZELTİLDİ
+if (isset($_GET['action']) && $_GET['action'] === 'send_temp_message' && isUserLoggedIn()) {
+    $tempMessage = getTempContactMessage();
+    if ($tempMessage) {
+        $user_id = $_SESSION['user_id'];
+        $stmt = $conn->prepare("INSERT INTO contacts (user_id, name, email, phone, subject, message) VALUES (?, ?, ?, ?, ?, ?)");
+        
+        if ($stmt) {
+            $stmt->bind_param("isssss", $user_id, $tempMessage['name'], $tempMessage['email'], $tempMessage['phone'], $tempMessage['subject'], $tempMessage['message']);
+            
+            if ($stmt->execute()) {
+                clearTempContactMessage();
+                $_SESSION['contact_success'] = 'Mesajınız başarıyla gönderildi. En kısa zamanda sizinle iletişime geçeceğiz.';
+            } else {
+                $error = 'Mesaj gönderilirken bir hata oluştu.';
+            }
+            $stmt->close();
+        }
+        
+        ob_end_clean();
+        header('Location: contact.php');
+        exit();
+    }
+}
+
+// Session'dan success mesajını al
+if (isset($_SESSION['contact_success'])) {
+    $success = $_SESSION['contact_success'];
+    unset($_SESSION['contact_success']);
+}
+
+// Giriş yapmış kullanıcı için formu otomatik doldur
+$current_user = null;
+if (isUserLoggedIn()) {
+    $user_id = $_SESSION['user_id'];
+    $stmt = $conn->prepare("SELECT username, email FROM users WHERE id = ?");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $current_user = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+}
+
+// Session'da kayıtlı geçici mesaj varsa formu doldur
+$tempMessage = getTempContactMessage();
+if ($tempMessage && !isUserLoggedIn()) {
+    $name = $tempMessage['name'];
+    $email = $tempMessage['email'];
+    $phone = $tempMessage['phone'];
+    $subject = $tempMessage['subject'];
+    $message_content = $tempMessage['message'];
+} else {
+    $name = $current_user ? $current_user['username'] : '';
+    $email = $current_user ? $current_user['email'] : '';
+    $phone = '';
+    $subject = '';
+    $message_content = '';
 }
 ?>
 
@@ -62,11 +232,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="card border-0 shadow-sm">
                         <div class="card-header bg-white border-bottom">
                             <h5 class="fw-bold mb-0">Bize Mesaj Gönderin</h5>
+                            <p class="text-muted mb-0 small">* İşaretli alanlar zorunludur</p>
                         </div>
                         <div class="card-body">
                             <?php if ($error): ?>
                                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                                    <i class="fas fa-exclamation-circle me-2"></i><?php echo htmlspecialchars($error); ?>
+                                    <i class="fas fa-exclamation-circle me-2"></i>
+                                    <div><?php echo $error; ?></div>
                                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                                 </div>
                             <?php endif; ?>
@@ -78,32 +250,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 </div>
                             <?php endif; ?>
 
-                            <form method="POST">
+                            <form method="POST" id="contactForm">
+                                <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label for="name" class="form-label fw-medium">Ad Soyad *</label>
-                                        <input type="text" class="form-control" id="name" name="name" required>
+                                        <label for="name" class="form-label fw-medium">Ad Soyad <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="name" name="name" 
+                                               value="<?php echo htmlspecialchars($name); ?>" 
+                                               required
+                                               minlength="2"
+                                               maxlength="50"
+                                               pattern="[a-zA-ZğüşıöçĞÜŞİÖÇ\s]+"
+                                               title="Sadece harf ve boşluk kullanabilirsiniz">
+                                        <div class="form-text">En az 2 karakter</div>
                                     </div>
                                     <div class="col-md-6">
-                                        <label for="email" class="form-label fw-medium">E-posta *</label>
-                                        <input type="email" class="form-control" id="email" name="email" required>
+                                        <label for="email" class="form-label fw-medium">E-posta <span class="text-danger">*</span></label>
+                                        <input type="email" class="form-control" id="email" name="email" 
+                                               value="<?php echo htmlspecialchars($email); ?>" 
+                                               required
+                                               maxlength="100">
+                                        <div class="form-text">Geçerli bir e-posta adresi girin</div>
                                     </div>
                                     <div class="col-md-6">
                                         <label for="phone" class="form-label fw-medium">Telefon</label>
-                                        <input type="tel" class="form-control" id="phone" name="phone">
+                                        <input type="tel" class="form-control" id="phone" name="phone" 
+                                               value="<?php echo htmlspecialchars($phone); ?>"
+                                               pattern="[\+]?[0-9\s\-\(\)]+"
+                                               title="Geçerli bir telefon numarası girin">
+                                        <div class="form-text">Örn: 0555 123 4567</div>
                                     </div>
                                     <div class="col-md-6">
-                                        <label for="subject" class="form-label fw-medium">Konu *</label>
-                                        <input type="text" class="form-control" id="subject" name="subject" required>
+                                        <label for="subject" class="form-label fw-medium">Konu <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="subject" name="subject" 
+                                               value="<?php echo htmlspecialchars($subject); ?>" 
+                                               required
+                                               minlength="3"
+                                               maxlength="100">
+                                        <div class="form-text">3-100 karakter arasında</div>
                                     </div>
                                     <div class="col-12">
-                                        <label for="message" class="form-label fw-medium">Mesaj *</label>
-                                        <textarea class="form-control" id="message" name="message" rows="6" required></textarea>
+                                        <label for="message" class="form-label fw-medium">Mesaj <span class="text-danger">*</span></label>
+                                        <textarea class="form-control" id="message" name="message" rows="6" 
+                                                  required
+                                                  minlength="10"
+                                                  maxlength="1000"
+                                                  placeholder="Mesajınızı detaylı bir şekilde yazın..."><?php echo htmlspecialchars($message_content); ?></textarea>
+                                        <div class="form-text d-flex justify-content-between">
+                                            <span>10-1000 karakter arasında</span>
+                                            <span id="messageCounter">0/1000</span>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="mt-4">
-                                    <button type="submit" class="btn btn-primary btn-lg">
-                                        <i class="fas fa-paper-plane me-2"></i>Mesaj Gönder
+                                    <button type="submit" class="btn btn-primary btn-lg px-4" id="submitBtn">
+                                        <i class="fas fa-paper-plane me-2"></i>
+                                        <?php echo isUserLoggedIn() ? 'Mesaj Gönder' : 'Giriş Yap ve Mesaj Gönder'; ?>
+                                    </button>
+                                    <button type="reset" class="btn btn-outline-secondary ms-2">
+                                        <i class="fas fa-undo me-2"></i>Temizle
                                     </button>
                                 </div>
                             </form>
@@ -199,13 +405,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </section>
 
-    <!-- Map Section (İsteğe bağlı) -->
+    <!-- Map Section -->
     <section class="py-5 bg-light">
         <div class="container">
             <div class="text-center mb-4" data-aos="fade-up">
                 <h2 class="display-5 fw-bold text-dark mb-3" style="font-family: 'Playfair Display', serif;">
                     Harita
                 </h2>
+                <p class="text-muted">Ofisimizin konumunu haritada görebilirsiniz</p>
             </div>
             <div class="row">
                 <div class="col-12">
@@ -224,6 +431,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <h2 class="display-5 fw-bold text-dark mb-3" style="font-family: 'Playfair Display', serif;">
                     Sık Sorulan <span class="text-primary">Sorular</span>
                 </h2>
+                <p class="text-muted">Müşterilerimizin en çok sorduğu sorular ve cevapları</p>
             </div>
 
             <div class="row">
@@ -231,7 +439,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="accordion" id="faqAccordion">
                         <div class="accordion-item border-0 shadow-sm mb-3 rounded-3">
                             <h2 class="accordion-header">
-                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                <button class="accordion-button bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                    <i class="fas fa-shipping-fast text-primary me-3"></i>
                                     Kargo ücreti ne kadar?
                                 </button>
                             </h2>
@@ -244,7 +453,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         <div class="accordion-item border-0 shadow-sm mb-3 rounded-3">
                             <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                <button class="accordion-button collapsed bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                    <i class="fas fa-truck text-success me-3"></i>
                                     Teslimat süresi ne kadar?
                                 </button>
                             </h2>
@@ -257,7 +467,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         <div class="accordion-item border-0 shadow-sm mb-3 rounded-3">
                             <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                <button class="accordion-button collapsed bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                    <i class="fas fa-undo text-warning me-3"></i>
                                     İade politikanız nedir?
                                 </button>
                             </h2>
@@ -270,7 +481,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         <div class="accordion-item border-0 shadow-sm mb-3 rounded-3">
                             <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                                <button class="accordion-button collapsed bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                                    <i class="fas fa-credit-card text-info me-3"></i>
                                     Hangi ödeme yöntemlerini kabul ediyorsunuz?
                                 </button>
                             </h2>
@@ -285,5 +497,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </div>
     </section>
+
+    <script>
+    // Mesaj karakter sayacı
+    document.addEventListener('DOMContentLoaded', function() {
+        const messageTextarea = document.getElementById('message');
+        const messageCounter = document.getElementById('messageCounter');
+        
+        if (messageTextarea && messageCounter) {
+            // Başlangıç değeri
+            messageCounter.textContent = messageTextarea.value.length + '/1000';
+            
+            // Değişiklikleri dinle
+            messageTextarea.addEventListener('input', function() {
+                const length = this.value.length;
+                messageCounter.textContent = length + '/1000';
+                
+                if (length > 1000) {
+                    messageCounter.classList.add('text-danger');
+                } else {
+                    messageCounter.classList.remove('text-danger');
+                }
+            });
+        }
+        
+        // Form gönderimini kontrol et
+        const contactForm = document.getElementById('contactForm');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        if (contactForm) {
+            contactForm.addEventListener('submit', function(e) {
+                // Çift gönderimi önle
+                if (submitBtn.disabled) {
+                    e.preventDefault();
+                    return;
+                }
+                
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Gönderiliyor...';
+            });
+        }
+    });
+    </script>
 
 <?php require_once 'includes/footer.php'; ?>

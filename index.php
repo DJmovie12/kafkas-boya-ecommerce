@@ -1,8 +1,10 @@
 <?php
 $page_title = "Kafkas Boya - Profesyonel Boya Çözümleri";
 require_once 'includes/header.php';
+require_once 'includes/db_connect.php';
 ?>
-<style>/* Product Cards */
+<style>
+/* Product Cards */
 .product-card {
     transition: all 0.3s ease;
 }
@@ -32,9 +34,139 @@ require_once 'includes/header.php';
     transform: translateY(0);
 }
 
-.product-badge .badge {
-    z-index: 5;
-}</style>
+.star-rating {
+    color: #ffc107;
+}
+
+/* Mobile Responsive for Products */
+@media (max-width: 767px) {
+    .mobile-product-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 12px !important;
+        width: 100% !important;
+    }
+    
+    .mobile-product-grid > div {
+        width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+    }
+    
+    .mobile-product-card {
+        width: 100% !important;
+        max-width: 165px !important;
+        margin: 0 auto !important;
+    }
+    
+    .mobile-product-image {
+        height: 140px !important;
+    }
+    
+    .mobile-product-info {
+        padding: 12px !important;
+    }
+    
+    .mobile-product-info h6 {
+        font-size: 13px !important;
+        line-height: 1.3 !important;
+        margin-bottom: 8px !important;
+    }
+    
+    .mobile-product-info p {
+        font-size: 11px !important;
+        line-height: 1.2 !important;
+        margin-bottom: 8px !important;
+    }
+    
+    .mobile-product-price {
+        font-size: 14px !important;
+    }
+    
+    .mobile-centered {
+        text-align: center !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+    
+    .mobile-full-center {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        flex-direction: column !important;
+    }
+}
+
+/* Mobile Responsive for Brands */
+@media (max-width: 767px) {
+    .mobile-brand-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 12px !important;
+        width: 100% !important;
+    }
+    
+    .mobile-brand-grid > div {
+        width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+    }
+    
+    .mobile-brand-card {
+        width: 100% !important;
+        max-width: 140px !important;
+        margin: 0 auto !important;
+        padding: 16px !important;
+    }
+    
+    .mobile-brand-logo {
+        width: 50px !important;
+        height: 50px !important;
+    }
+    
+    .mobile-brand-logo img {
+        width: 45px !important;
+        height: 45px !important;
+    }
+    
+    .mobile-brand-card h5 {
+        font-size: 13px !important;
+        margin-bottom: 6px !important;
+    }
+    
+    .mobile-brand-card p {
+        font-size: 10px !important;
+        margin-bottom: 8px !important;
+    }
+    
+    .mobile-brand-card .btn {
+        font-size: 10px !important;
+        padding: 4px 8px !important;
+    }
+}
+
+/* General Mobile Styles */
+@media (max-width: 767px) {
+    .mobile-text-center {
+        text-align: center !important;
+    }
+    
+    .mobile-justify-center {
+        justify-content: center !important;
+    }
+    
+    .mobile-mx-auto {
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+    
+    .mobile-w-100 {
+        width: 100% !important;
+    }
+}
+</style>
+
     <!-- HERO SECTION -->
     <section class="hero-section position-relative overflow-hidden" style="margin-top: 70px; height: 100vh;">
         <div class="hero-background" style="background-image: url('assets/img/slide-1.webp');"></div>
@@ -42,7 +174,7 @@ require_once 'includes/header.php';
 
         <div class="container h-100 position-relative z-index-1">
             <div class="row h-100 align-items-center">
-                <div class="col-lg-6 d-flex flex-column justify-content-center" data-aos="fade-right">
+                <div class="col-lg-6 d-flex flex-column justify-content-center mobile-text-center" data-aos="fade-right">
                     <h1 class="display-3 fw-bold text-white mb-4" style="font-family: 'Playfair Display', serif;">
                         Evinize <span class="text-warning">Renk</span> Katın
                     </h1>
@@ -50,7 +182,7 @@ require_once 'includes/header.php';
                         Kafkas Boya olarak 20 yıllık deneyimimizle, profesyonel boya çözümleri sunuyoruz.
                         En kaliteli markalar, geniş ürün yelpazesi ve uzman desteğiyle yanınızdayız.
                     </p>
-                    <div class="d-flex flex-wrap gap-3">
+                    <div class="d-flex flex-wrap gap-3 mobile-justify-center">
                         <a href="shop.php" class="btn btn-warning btn-lg px-4 py-3 rounded-pill fw-bold">
                             <i class="fas fa-shopping-cart me-2"></i>Alışverişe Başla
                         </a>
@@ -64,78 +196,244 @@ require_once 'includes/header.php';
         </div>
     </section>
 
+    <!-- MARKALAR SECTION -->
+    <section id="favori-markalar" class="py-5 bg-white">
+        <div class="container">
+            <div class="text-center mb-5" data-aos="fade-up">
+                <h2 class="display-5 fw-bold text-dark mb-3" style="font-family: 'Playfair Display', serif;">
+                    Anlaştığımız <span class="text-primary">Boya Markaları</span>
+                </h2>
+                <p class="lead text-muted">Sektörün lider markalarıyla iş ortaklığımız</p>
+            </div>
+
+            <div class="row g-4 justify-content-center mobile-brand-grid">
+                <?php
+                $brands = ['polisan', 'filli-boya', 'marshall', 'dyo', 'permolit'];
+                $brand_names = ['Polisan', 'Filli Boya', 'Marshall', 'DYO', 'Permolit'];
+                $brand_colors = ['primary', 'success', 'warning', 'danger', 'info'];
+                $brand_descriptions = ['Premium kalite', 'Geniş renk paleti', 'Dayanıklı çözümler', 'Ekonomik çözümler', 'Profesyonel seçim'];
+
+                foreach ($brands as $index => $brand) {
+                    $brand_name = $brand_names[$index];
+                    $brand_color = $brand_colors[$index];
+                    $brand_desc = $brand_descriptions[$index];
+                ?>
+                <div class="col-lg-2 col-md-4 col-6 text-center" data-aos="zoom-in" data-aos-delay="<?php echo ($index * 100) + 100; ?>">
+                    <div class="brand-card h-100 p-4 bg-white rounded-4 shadow-sm text-center hover-lift mobile-brand-card">
+                        <div class="brand-logo mb-3 mobile-full-center">
+                            <div class="brand-icon bg-<?php echo $brand_color; ?> bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mobile-brand-logo">
+                                <img src="assets/img/<?php echo $brand; ?>.webp" alt="<?php echo $brand_name; ?> logo" style="width: 100%; height: auto; border-radius: 100%;">
+                            </div>
+                        </div>
+                        <h5 class="fw-semibold text-dark mb-2"><?php echo $brand_name; ?></h5>
+                        <p class="text-muted small mb-3"><?php echo $brand_desc; ?></p>
+                        <a href="shop.php?marka=<?php echo $brand; ?>" class="btn btn-outline-primary btn-sm">İncele</a>
+                    </div>
+                </div>
+                <?php } ?>
+
+                <div class="col-lg-2 col-md-4 col-6 text-center" data-aos="zoom-in" data-aos-delay="<?php echo (count($brands) * 100) + 100; ?>">
+                    <div class="brand-card h-100 p-4 bg-primary bg-opacity-75 rounded-4 shadow-lg text-center hover-lift mobile-brand-card">
+                        <div class="brand-logo mb-3 mobile-full-center">
+
+                        </div>
+                        <h5 class="fw-semibold text-white mb-2">Tüm Markalarımız</h5>
+                        <p class="text-white small mb-3">Çok daha fazlasını keşfet</p>
+                        <a href="shop.php" class="btn btn-light btn-sm">Mağazaya Git</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- FAVORI ÜRÜNLER SECTION -->
     <section class="py-5 bg-white">
         <div class="container">
             <div class="text-center mb-5" data-aos="fade-up">
                 <h2 class="display-5 fw-bold text-dark mb-3" style="font-family: 'Playfair Display', serif;">
-                    <span class="text-primary">Popüler</span> Ürünler
+                    <span class="text-primary">En Beğenilen</span> Ürünler
                 </h2>
-                <p class="lead text-muted">Müşterilerimizin en çok tercih ettiği boya ürünleri</p>
+                <p class="lead text-muted">Müşterilerimizin en çok yorum yaptığı ve en yüksek puan verdiği ürünler</p>
             </div>
 
-            <div class="row g-4">
+            <div class="row g-4 mobile-product-grid">
                 <?php
-                // Popüler ürünleri veritabanından çek (ilk 4 ürün)
-                $featured_sql = "SELECT p.*, b.name as brand_name FROM products p 
-                                LEFT JOIN brands b ON p.brand_id = b.id 
-                                ORDER BY p.created_at DESC LIMIT 4";
+                // En çok yorum ve en yüksek puan alan ürünleri çek
+                $popular_sql = "SELECT 
+                    p.*, 
+                    b.name as brand_name,
+                    COUNT(r.id) as review_count,
+                    AVG(r.rating) as avg_rating,
+                    (COUNT(r.id) * 0.6 + AVG(r.rating) * 0.4) as popularity_score
+                FROM products p 
+                LEFT JOIN brands b ON p.brand_id = b.id 
+                LEFT JOIN reviews r ON p.id = r.product_id 
+                WHERE p.stock > 0
+                GROUP BY p.id 
+                HAVING review_count > 0
+                ORDER BY popularity_score DESC, review_count DESC, avg_rating DESC 
+                LIMIT 4";
                 
-                $featured_result = $conn->query($featured_sql);
+                $popular_result = $conn->query($popular_sql);
                 
-                if ($featured_result && $featured_result->num_rows > 0) {
-                    $featured_products = $featured_result->fetch_all(MYSQLI_ASSOC);
+                if ($popular_result && $popular_result->num_rows > 0) {
+                    $popular_products = $popular_result->fetch_all(MYSQLI_ASSOC);
                     
-                    foreach ($featured_products as $index => $product) {
-                        $badge_types = ['Popüler', 'En Çok Satan', 'Önerilen', 'Ekonomik'];
+                    foreach ($popular_products as $index => $product) {
+                        // Badge türlerini belirle
+                        $badge_types = ['Popüler', 'En Çok Yorum', 'Yüksek Puan', 'Favori'];
                         $badge = $badge_types[$index % 4];
-                        $rating = 4.5 + ($index * 0.1);
+                        
+                        // Rating ve review bilgilerini hazırla
+                        $avg_rating = $product['avg_rating'] ? round($product['avg_rating'], 1) : 0;
+                        $review_count = $product['review_count'] ?: 0;
+                        
+                        // Yıldız rating gösterimi
+                        $stars = '';
+                        $full_stars = floor($avg_rating);
+                        $has_half_star = ($avg_rating - $full_stars) >= 0.5;
+                        
+                        for ($i = 1; $i <= 5; $i++) {
+                            if ($i <= $full_stars) {
+                                $stars .= '<i class="fas fa-star star-rating"></i>';
+                            } elseif ($i == $full_stars + 1 && $has_half_star) {
+                                $stars .= '<i class="fas fa-star-half-alt star-rating"></i>';
+                            } else {
+                                $stars .= '<i class="far fa-star star-rating"></i>';
+                            }
+                        }
                     ?>
-                    <div class="col-lg-3 col-md-6" data-aos="fade-up" data-aos-delay="<?php echo ($index * 100); ?>">
-                        <div class="product-card rounded-4 overflow-hidden shadow-sm hover-shadow h-100 d-flex flex-column">
-                            <div class="product-image position-relative overflow-hidden" style="height: 220px; background-color: #f8f9fa;">
+                    <div class="col-lg-3 col-md-6 text-center" data-aos="fade-up" data-aos-delay="<?php echo ($index * 100); ?>">
+                        <div class="product-card rounded-4 overflow-hidden shadow-sm hover-shadow h-100 d-flex flex-column mobile-product-card">
+                            <div class="product-image position-relative overflow-hidden mobile-product-image" style="background-color: #f8f9fa;">
                                 <?php if (!empty($product['image'])): ?>
                                     <img src="<?php echo htmlspecialchars($product['image']); ?>" 
                                          alt="<?php echo htmlspecialchars($product['name']); ?>" 
                                          class="w-100 h-100" style="object-fit: cover;">
                                 <?php else: ?>
                                     <div class="w-100 h-100 d-flex align-items-center justify-content-center">
-                                        <i class="fas fa-image text-muted" style="font-size: 2rem;"></i>
+                                        <i class="fas fa-image text-muted" style="font-size: 1.5rem;"></i>
                                     </div>
                                 <?php endif; ?>
-                                <span class="badge bg-primary position-absolute top-0 start-0 m-3"><?php echo $badge; ?></span>
-                                <div class="product-actions d-flex flex-column gap-2 p-3">
-                                    <a href="shop-single.php?id=<?php echo $product['id']; ?>" class="btn btn-primary btn-sm w-100">
+                                
+                                <!-- Badge -->
+                                <span class="badge bg-primary position-absolute top-0 start-0 m-2" style="font-size: 10px;"><?php echo $badge; ?></span>
+                                
+                                <!-- Review Badge -->
+                                <?php if ($review_count > 0): ?>
+                                    <span class="badge bg-success position-absolute top-0 end-0 m-2" style="font-size: 10px;">
+                                        <i class="fas fa-comment me-1"></i><?php echo $review_count; ?>
+                                    </span>
+                                <?php endif; ?>
+                                
+                                <div class="product-actions d-flex flex-column gap-2 p-2">
+                                    <a href="shop-single.php?id=<?php echo $product['id']; ?>" class="btn btn-primary btn-sm w-100" style="font-size: 11px; padding: 4px 8px;">
                                         <i class="fas fa-eye me-1"></i>Detaylı İncele
                                     </a>
-                                    <button class="btn btn-warning btn-sm w-100 add-to-cart" data-product="<?php echo $product['id']; ?>">
+                                    <button class="btn btn-warning btn-sm w-100 add-to-cart" data-product="<?php echo $product['id']; ?>" style="font-size: 11px; padding: 4px 8px;">
                                         <i class="fas fa-shopping-cart me-1"></i>Sepete Ekle
                                     </button>
                                 </div>
                             </div>
-                            <div class="product-info p-3 flex-grow-1 d-flex flex-column">
+                            
+                            <div class="product-info mobile-product-info flex-grow-1 d-flex flex-column mobile-text-center">
                                 <h6 class="fw-semibold text-dark mb-2"><?php echo htmlspecialchars($product['name']); ?></h6>
-                                <div class="mb-2">
-                                    <i class="fas fa-star text-warning"></i>
-                                    <small class="text-muted"><?php echo number_format($rating, 1); ?>/5</small>
+                                
+                                <!-- Rating Section -->
+                                <div class="mb-2 mobile-full-center">
+                                    <div class="d-flex align-items-center mb-1 mobile-justify-center">
+                                        <div style="font-size: 12px;">
+                                            <?php echo $stars; ?>
+                                        </div>
+                                        <small class="text-muted ms-1" style="font-size: 11px;"><?php echo $avg_rating; ?>/5</small>
+                                    </div>
+                                    <?php if ($review_count > 0): ?>
+                                        <small class="text-muted" style="font-size: 10px;">
+                                            <i class="fas fa-comment me-1"></i><?php echo $review_count; ?> yorum
+                                        </small>
+                                    <?php else: ?>
+                                        <small class="text-muted" style="font-size: 10px;">Henüz yorum yok</small>
+                                    <?php endif; ?>
                                 </div>
-                                <p class="text-muted small mb-3">
+                                
+                                <p class="text-muted small mb-3" style="font-size: 11px; line-height: 1.3;">
                                     <?php 
                                     if (!empty($product['brand_name'])) {
-                                        echo htmlspecialchars($product['brand_name']) . ' marka profesyonel boya';
+                                        echo htmlspecialchars($product['brand_name']) . ' marka';
                                     } else {
-                                        echo 'Yüksek kaliteli profesyonel boya çözümü';
+                                        echo 'Profesyonel boya';
                                     }
                                     ?>
                                 </p>
-                                <h5 class="text-primary fw-bold mt-auto">₺<?php echo number_format($product['price'], 2, ',', '.'); ?></h5>
+                                
+                                <h5 class="text-primary fw-bold mt-auto mobile-product-price">₺<?php echo number_format($product['price'], 2, ',', '.'); ?></h5>
                             </div>
                         </div>
                     </div>
                     <?php 
                     }
                 } else {
-                    echo '<div class="col-12 text-center py-5"><p class="text-muted">Ürün bulunamadı</p></div>';
+                    // Popüler ürün yoksa normal ürünleri göster
+                    $fallback_sql = "SELECT p.*, b.name as brand_name FROM products p 
+                                    LEFT JOIN brands b ON p.brand_id = b.id 
+                                    WHERE p.stock > 0
+                                    ORDER BY p.created_at DESC LIMIT 4";
+                    
+                    $fallback_result = $conn->query($fallback_sql);
+                    
+                    if ($fallback_result && $fallback_result->num_rows > 0) {
+                        $fallback_products = $fallback_result->fetch_all(MYSQLI_ASSOC);
+                        
+                        foreach ($fallback_products as $index => $product) {
+                            $badge_types = ['Yeni', 'Popüler', 'Önerilen', 'Favori'];
+                            $badge = $badge_types[$index % 4];
+                        ?>
+                        <div class="col-lg-3 col-md-6 text-center" data-aos="fade-up" data-aos-delay="<?php echo ($index * 100); ?>">
+                            <div class="product-card rounded-4 overflow-hidden shadow-sm hover-shadow h-100 d-flex flex-column mobile-product-card">
+                                <div class="product-image position-relative overflow-hidden mobile-product-image" style="background-color: #f8f9fa;">
+                                    <?php if (!empty($product['image'])): ?>
+                                        <img src="<?php echo htmlspecialchars($product['image']); ?>" 
+                                             alt="<?php echo htmlspecialchars($product['name']); ?>" 
+                                             class="w-100 h-100" style="object-fit: cover;">
+                                    <?php else: ?>
+                                        <div class="w-100 h-100 d-flex align-items-center justify-content-center">
+                                            <i class="fas fa-image text-muted" style="font-size: 1.5rem;"></i>
+                                        </div>
+                                    <?php endif; ?>
+                                    <span class="badge bg-primary position-absolute top-0 start-0 m-2" style="font-size: 10px;"><?php echo $badge; ?></span>
+                                    <div class="product-actions d-flex flex-column gap-2 p-2">
+                                        <a href="shop-single.php?id=<?php echo $product['id']; ?>" class="btn btn-primary btn-sm w-100" style="font-size: 11px; padding: 4px 8px;">
+                                            <i class="fas fa-eye me-1"></i>Detaylı İncele
+                                        </a>
+                                        <button class="btn btn-warning btn-sm w-100 add-to-cart" data-product="<?php echo $product['id']; ?>" style="font-size: 11px; padding: 4px 8px;">
+                                            <i class="fas fa-shopping-cart me-1"></i>Sepete Ekle
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="product-info mobile-product-info flex-grow-1 d-flex flex-column mobile-text-center">
+                                    <h6 class="fw-semibold text-dark mb-2"><?php echo htmlspecialchars($product['name']); ?></h6>
+                                    <div class="mb-2 mobile-full-center">
+                                        <i class="fas fa-star text-warning" style="font-size: 12px;"></i>
+                                        <small class="text-muted" style="font-size: 11px;">Henüz değerlendirilmemiş</small>
+                                    </div>
+                                    <p class="text-muted small mb-3" style="font-size: 11px; line-height: 1.3;">
+                                        <?php 
+                                        if (!empty($product['brand_name'])) {
+                                            echo htmlspecialchars($product['brand_name']) . ' marka';
+                                        } else {
+                                            echo 'Profesyonel boya';
+                                        }
+                                        ?>
+                                    </p>
+                                    <h5 class="text-primary fw-bold mt-auto mobile-product-price">₺<?php echo number_format($product['price'], 2, ',', '.'); ?></h5>
+                                </div>
+                            </div>
+                        </div>
+                        <?php 
+                        }
+                    } else {
+                        echo '<div class="col-12 text-center py-5"><p class="text-muted">Ürün bulunamadı</p></div>';
+                    }
                 }
                 ?>
             </div>
@@ -208,57 +506,7 @@ require_once 'includes/header.php';
         </div>
     </section>
 
-    <!-- MARKALAR SECTION -->
-    <section id="favori-markalar" class="py-5 bg-white">
-        <div class="container">
-            <div class="text-center mb-5" data-aos="fade-up">
-                <h2 class="display-5 fw-bold text-dark mb-3" style="font-family: 'Playfair Display', serif;">
-                    Anlaştığımız <span class="text-primary">Boya Markaları</span>
-                </h2>
-                <p class="lead text-muted">Sektörün lider markalarıyla iş ortaklığımız</p>
-            </div>
 
-            <div class="row g-4 justify-content-center">
-                <?php
-                $brands = ['polisan', 'filli-boya', 'marshall', 'dyo', 'permolit'];
-                $brand_names = ['Polisan', 'Filli Boya', 'Marshall', 'DYO', 'Permolit'];
-                $brand_colors = ['primary', 'success', 'warning', 'danger', 'info'];
-                $brand_descriptions = ['Premium kalite', 'Geniş renk paleti', 'Dayanıklı çözümler', 'Ekonomik çözümler', 'Profesyonel seçim'];
-
-                foreach ($brands as $index => $brand) {
-                    $brand_name = $brand_names[$index];
-                    $brand_color = $brand_colors[$index];
-                    $brand_desc = $brand_descriptions[$index];
-                ?>
-                <div class="col-lg-2 col-md-4 col-6" data-aos="zoom-in" data-aos-delay="<?php echo ($index * 100) + 100; ?>">
-                    <div class="brand-card h-100 p-4 bg-white rounded-4 shadow-sm text-center hover-lift">
-                        <div class="brand-logo mb-3">
-                            <div class="brand-icon bg-<?php echo $brand_color; ?> bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
-                                <img src="assets/img/<?php echo $brand; ?>.webp" alt="<?php echo $brand_name; ?> logo" style="width: 70px; height: auto; border-radius: 100%;">
-                            </div>
-                        </div>
-                        <h5 class="fw-semibold text-dark mb-2"><?php echo $brand_name; ?></h5>
-                        <p class="text-muted small mb-3"><?php echo $brand_desc; ?></p>
-                        <a href="shop.php?marka=<?php echo $brand; ?>" class="btn btn-outline-primary btn-sm">İncele</a>
-                    </div>
-                </div>
-                <?php } ?>
-
-                <div class="col-lg-2 col-md-4 col-6" data-aos="zoom-in" data-aos-delay="<?php echo (count($brands) * 100) + 100; ?>">
-                    <div class="brand-card h-100 p-4 bg-primary bg-opacity-75 rounded-4 shadow-lg text-center hover-lift">
-                        <div class="brand-logo mb-3">
-                            <div class="brand-icon bg-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
-                                <i class="fas fa-store text-primary" style="font-size: 32px;"></i>
-                            </div>
-                        </div>
-                        <h5 class="fw-semibold text-white mb-2">Tüm Markalarımız</h5>
-                        <p class="text-white small mb-3">Çok daha fazlasını keşfet</p>
-                        <a href="shop.php" class="btn btn-light btn-sm">Mağazaya Git</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
 
     <!-- NEDEN BÄ°Z SECTION -->
     <section class="py-5 bg-light">
